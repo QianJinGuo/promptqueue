@@ -1,0 +1,21 @@
+{
+  "name": "promptqueue",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "serve": "tsx packages/cli/src/index.ts serve",
+    "submit": "tsx packages/cli/src/index.ts submit",
+    "pq-status": "tsx packages/cli/src/index.ts status",
+    "pq-list": "tsx packages/cli/src/index.ts list"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.0"
+  },
+  "packageManager": "pnpm@10.11.0"
+}

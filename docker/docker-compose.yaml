@@ -1,0 +1,14 @@
+services:
+  promptqueue:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../data:/root/.promptqueue
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
