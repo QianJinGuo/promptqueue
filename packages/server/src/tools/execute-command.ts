@@ -38,14 +38,27 @@ export async function executeCommand(args: {
     // manual SIGTERM timer can race on some Node versions (CI ubuntu
     // + Node 20), leaving the test blocked on the natural exit of
     // `sleep 60`. Manual timer alone is the reliable signal.
-    const child = spawn("sh", ["-c", command]);
+    //
+    // `detached: true` puts the child in its own process group so we
+    // can kill the whole group (sh + its sleep grandchild) with
+    // process.kill(-pid, signal). Without this, killing `sh` on
+    // ubuntu leaves the `sleep` grandchild orphaned and unkillable,
+    // and the test hangs for 60s.
+    const child = spawn("sh", ["-c", command], { detached: true });
 
     child.stdout?.on("data", (data: Buffer) => { stdout += data.toString(); });
     child.stderr?.on("data", (data: Buffer) => { stderr += data.toString(); });
 
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill("SIGTERM"); } catch { /* already exited */ }
+      // Kill the whole process group: sh + its sleep grandchild.
+      // On ubuntu, dash (the default /bin/sh) ignores SIGTERM but
+      // the process group kill still goes through. Escalate to
+      // SIGKILL if SIGTERM doesn't take effect within 200ms.
+      try { process.kill(-child.pid!, "SIGTERM"); } catch { /* already exited */ }
+      setTimeout(() => {
+        try { process.kill(-child.pid!, "SIGKILL"); } catch { /* already exited */ }
+      }, 200).unref();
     }, timeoutMs);
 
     child.on("close", (code: number | null) => {
