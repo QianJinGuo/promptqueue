@@ -20,6 +20,9 @@ export type {
   RoutingConfig,
   WorkerConfig,
   AppConfig,
+  AgentRequest,
+  AgentEvent,
+  ToolDefinition,
 } from "./types.js";
 
 export {

@@ -1,3 +1,7 @@
+import type { AgentRequest, AgentEvent, ToolDefinition } from "./types/agent.js";
+
+export type { AgentRequest, AgentEvent, ToolDefinition };
+
 // --- Task Types ---
 
 export type TaskStatus =
@@ -42,6 +46,7 @@ export interface Task {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  nextRetryAt?: string | null;
 }
 
 // --- Provider Types ---
@@ -74,6 +79,7 @@ export interface ProviderAdapter {
   readonly models: readonly string[];
   execute(request: ProviderRequest): Promise<ProviderResponse>;
   healthCheck(): Promise<ProviderHealth>;
+  executeAgent?(request: AgentRequest, signal?: AbortSignal): AsyncIterable<AgentEvent>;
 }
 
 // --- Router Types ---
