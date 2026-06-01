@@ -165,7 +165,7 @@ function collectOutput(child: ChildProcess, timeoutMs: number): Promise<Collecte
       try { child.kill("SIGTERM"); } catch { /* already exited */ }
     }, timeoutMs);
 
-    child.on("close", (code) => {
+    child.on("close", (code: number | null) => {
       clearTimeout(timer);
       if (stderr.trim()) {
         logger.info(`CLI provider stderr: ${stderr.trim()}`);
