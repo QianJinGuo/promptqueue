@@ -34,7 +34,11 @@ export async function executeCommand(args: {
     let stderr = "";
     let timedOut = false;
 
-    const child = spawn("sh", ["-c", command], { timeout: timeoutMs });
+    // Note: don't pass `timeout` to spawn — Node's spawn-kill and our
+    // manual SIGTERM timer can race on some Node versions (CI ubuntu
+    // + Node 20), leaving the test blocked on the natural exit of
+    // `sleep 60`. Manual timer alone is the reliable signal.
+    const child = spawn("sh", ["-c", command]);
 
     child.stdout?.on("data", (data: Buffer) => { stdout += data.toString(); });
     child.stderr?.on("data", (data: Buffer) => { stderr += data.toString(); });
@@ -44,7 +48,7 @@ export async function executeCommand(args: {
       try { child.kill("SIGTERM"); } catch { /* already exited */ }
     }, timeoutMs);
 
-    child.on("close", (code) => {
+    child.on("close", (code: number | null) => {
       clearTimeout(timer);
       if (timedOut) {
         resolve({ content: `Command timed out after ${timeout}s\n${stdout}`, isError: true });
