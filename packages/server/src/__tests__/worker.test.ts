@@ -55,7 +55,7 @@ describe('Worker', () => {
       healthCheck: () => Promise.resolve({ status: 'healthy', latencyMs: 0 }),
     });
 
-    const worker = new Worker(store, eventStore, eventBus, slowRegistry, {
+    const worker = new Worker(store, eventStore, eventBus, slowRegistry, null, {
       concurrency: 1,
       pollInterval: 50,
       retryBackoff: 'exponential',
@@ -90,7 +90,7 @@ describe('Worker', () => {
       healthCheck: () => Promise.resolve({ status: 'healthy', latencyMs: 0 }),
     });
 
-    const worker = new Worker(store, eventStore, eventBus, failRegistry, {
+    const worker = new Worker(store, eventStore, eventBus, failRegistry, null, {
       concurrency: 1,
       pollInterval: 50,
       retryBackoff: 'exponential',
@@ -125,7 +125,7 @@ describe('Worker', () => {
       healthCheck: () => Promise.resolve({ status: 'healthy', latencyMs: 0 }),
     });
 
-    const worker = new Worker(store, eventStore, eventBus, failRegistry, {
+    const worker = new Worker(store, eventStore, eventBus, failRegistry, null, {
       concurrency: 1,
       pollInterval: 50,
       retryBackoff: 'exponential',

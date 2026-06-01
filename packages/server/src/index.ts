@@ -7,6 +7,11 @@ import { MockProvider } from "./providers/mock.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import { ClaudeCodeProvider } from "./providers/claude-code.js";
+import { AnthropicSDKProvider } from "./providers/anthropic-sdk.js";
+import { ToolRegistry } from "./tools/registry.js";
+import { createExecuteCommandTool } from "./tools/execute-command.js";
+import { createReadFileTool } from "./tools/read-file.js";
+import { createWriteFileTool } from "./tools/write-file.js";
 import { Worker } from "./worker/worker.js";
 import { EventBus } from "./worker/event-bus.js";
 import { createApp } from "./app.js";
@@ -43,7 +48,7 @@ export function startServer(options: ServerOptions = {}): void {
 
   const config = options.config ?? DEFAULT_CONFIG;
 
-  const providers: Record<string, { type?: "api" | "cli"; apiKey?: string; defaultModel?: string; baseURL?: string; command?: string }> = config.providers;
+  const providers: Record<string, { type?: "api" | "cli" | "anthropic-sdk"; apiKey?: string; defaultModel?: string; baseURL?: string; command?: string }> = config.providers;
   const anthropic = providers["anthropic"];
   if (anthropic?.apiKey) {
     registry.register(new AnthropicProvider({
@@ -85,7 +90,40 @@ export function startServer(options: ServerOptions = {}): void {
 
   registry.register(new MockProvider());
 
-  const worker = new Worker(taskStore, eventStore, eventBus, registry, {
+  // Register AnthropicSDK provider if configured
+  for (const [name, providerConfig] of Object.entries(providers)) {
+    if (providerConfig.type === "anthropic-sdk" && providerConfig.apiKey) {
+      const sdkProvider = new AnthropicSDKProvider({
+        apiKey: providerConfig.apiKey,
+        defaultModel: providerConfig.defaultModel,
+        baseURL: providerConfig.baseURL,
+      });
+      registry.register(sdkProvider);
+      log(`Registered AnthropicSDK provider: ${name}`);
+    }
+  }
+
+  // Register tools if configured
+  let toolRegistry: ToolRegistry | null = null;
+  const toolConfig = (config as AppConfig).tools;
+  if (toolConfig && toolConfig.allowed.length > 0) {
+    toolRegistry = new ToolRegistry(toolConfig);
+    if (toolConfig.allowed.includes("execute_command")) {
+      const cmdTool = createExecuteCommandTool();
+      toolRegistry.register(cmdTool.definition, cmdTool.executor);
+    }
+    if (toolConfig.allowed.includes("read_file")) {
+      const readTool = createReadFileTool();
+      toolRegistry.register(readTool.definition, readTool.executor);
+    }
+    if (toolConfig.allowed.includes("write_file")) {
+      const writeTool = createWriteFileTool();
+      toolRegistry.register(writeTool.definition, writeTool.executor);
+    }
+    log(`Registered tools: ${toolConfig.allowed.join(", ")}`);
+  }
+
+  const worker = new Worker(taskStore, eventStore, eventBus, registry, toolRegistry, {
     concurrency,
     pollInterval: config.worker.pollInterval,
     retryBackoff: config.worker.retryBackoff,

@@ -15,6 +15,9 @@ export const createTaskSchema = z.object({
   callbackUrl: z.string().url().optional(),
   metadata: z.record(z.unknown()).optional(),
   systemPrompt: z.string().optional(),
+  tools: z.object({
+    enabled: z.boolean().default(false),
+  }).optional(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
@@ -46,7 +49,7 @@ export const configSchema = z.object({
   }).default({}),
   providers: z.record(
     z.object({
-      type: z.enum(["api", "cli"]).optional(),
+      type: z.enum(["api", "cli", "anthropic-sdk"]).optional(),
       apiKey: z.string().optional(),
       defaultModel: z.string().optional(),
       baseURL: z.string().optional(),
@@ -65,4 +68,10 @@ export const configSchema = z.object({
     retryDelay: z.coerce.number().int().positive().default(1000),
     maxRetries: z.coerce.number().int().min(0).max(10).default(3),
   }).default({}),
+  tools: z.object({
+    allowed: z.array(z.string()).default([]),
+    denied: z.array(z.string()).default([]),
+    maxTurns: z.coerce.number().int().positive().default(10),
+    timeout: z.coerce.number().int().positive().default(30),
+  }).optional(),
 });

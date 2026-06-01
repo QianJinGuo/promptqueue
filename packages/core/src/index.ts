@@ -23,6 +23,9 @@ export type {
   AgentRequest,
   AgentEvent,
   ToolDefinition,
+  ToolResult,
+  ToolExecutorFn,
+  ToolConfig,
 } from "./types.js";
 
 export {
@@ -39,4 +42,5 @@ export {
   ROUTING_STRATEGIES,
   PRIORITY_LEVELS,
   DEFAULT_CONFIG,
+  DEFAULT_TOOL_CONFIG,
 } from "./constants.js";

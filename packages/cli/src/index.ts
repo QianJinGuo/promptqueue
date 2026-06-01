@@ -30,6 +30,7 @@ program
   .option("--max-tokens <tokens>", "Max response tokens", parseInt)
   .option("--temperature <temp>", "Sampling temperature", parseFloat)
   .option("--callback-url <url>", "Webhook callback URL")
+  .option("--tools", "Enable tool loop for this task")
   .option("--api-url <url>", "API server URL", "http://localhost:9090")
   .action(async (prompt, options) => {
     const { submitTask } = await import("./commands/submit.js");

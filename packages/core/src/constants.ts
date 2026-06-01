@@ -1,4 +1,4 @@
-import type { TaskStatus, RoutingStrategy } from "./types.js";
+import type { TaskStatus, RoutingStrategy, ToolConfig } from "./types.js";
 
 export const TASK_ID_PREFIX = "t_";
 
@@ -47,4 +47,11 @@ export const DEFAULT_CONFIG = {
     retryDelay: 1000,
     maxRetries: 3,
   },
+};
+
+export const DEFAULT_TOOL_CONFIG: ToolConfig = {
+  allowed: ["execute_command", "read_file", "write_file"],
+  denied: [],
+  maxTurns: 10,
+  timeout: 30,
 };

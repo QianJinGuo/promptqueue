@@ -24,6 +24,7 @@ export async function submitTask(prompt: string, options: SubmitOptions): Promis
       maxTokens: options.maxTokens,
       temperature: options.temperature,
       callbackUrl: options.callbackUrl,
+      tools: options.tools ? { enabled: true } : undefined,
     }),
   });
 

@@ -1,6 +1,8 @@
-import type { AgentRequest, AgentEvent, ToolDefinition } from "./types/agent.js";
+import type { AgentRequest, AgentEvent } from "./types/agent.js";
+import type { ToolExecutorFn, ToolConfig } from "./types/tools.js";
 
-export type { AgentRequest, AgentEvent, ToolDefinition };
+export type { AgentRequest, AgentEvent } from "./types/agent.js";
+export type { ToolDefinition, ToolResult, ToolExecutorFn, ToolConfig } from "./types/tools.js";
 
 // --- Task Types ---
 
@@ -79,7 +81,7 @@ export interface ProviderAdapter {
   readonly models: readonly string[];
   execute(request: ProviderRequest): Promise<ProviderResponse>;
   healthCheck(): Promise<ProviderHealth>;
-  executeAgent?(request: AgentRequest, signal?: AbortSignal): AsyncIterable<AgentEvent>;
+  executeAgent?(request: AgentRequest, signal?: AbortSignal, toolExecutor?: ToolExecutorFn): AsyncIterable<AgentEvent>;
 }
 
 // --- Router Types ---
@@ -162,7 +164,7 @@ export interface StorageConfig {
 }
 
 export interface ProviderConfig {
-  type?: "api" | "cli";
+  type?: "api" | "cli" | "anthropic-sdk";
   apiKey?: string;
   defaultModel?: string;
   baseURL?: string;
@@ -187,4 +189,5 @@ export interface AppConfig {
   providers: Record<string, ProviderConfig>;
   routing: RoutingConfig;
   worker: WorkerConfig;
+  tools?: ToolConfig;
 }

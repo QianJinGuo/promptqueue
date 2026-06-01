@@ -36,6 +36,40 @@ const eventIcons: Record<string, React.ReactNode> = {
   agent_tool_result: <Terminal className="h-4 w-4 text-green-600" />,
 };
 
+function groupEventsIntoTurns(events: TaskEvent[]): TaskEvent[][] {
+  const turns: TaskEvent[][] = [];
+  let currentTurn: TaskEvent[] = [];
+
+  for (const event of events) {
+    const isAgentEvent = event.eventType.startsWith("agent_");
+
+    if (!isAgentEvent) {
+      if (currentTurn.length > 0) {
+        turns.push([...currentTurn]);
+        currentTurn = [];
+      }
+      turns.push([event]);
+      continue;
+    }
+
+    if (event.eventType === "agent_text" && currentTurn.length > 0) {
+      const lastInTurn = currentTurn[currentTurn.length - 1];
+      if (lastInTurn?.eventType === "agent_tool_result") {
+        turns.push([...currentTurn]);
+        currentTurn = [];
+      }
+    }
+
+    currentTurn.push(event);
+  }
+
+  if (currentTurn.length > 0) {
+    turns.push(currentTurn);
+  }
+
+  return turns;
+}
+
 function AgentEventContent({ event }: { event: TaskEvent }) {
   const payload = event.payload ?? {};
 
@@ -367,29 +401,38 @@ export default function TaskDetailPage() {
             <p className="text-sm text-muted-foreground">Waiting for events...</p>
           ) : (
             <div className="space-y-0 max-h-[600px] overflow-y-auto">
-              {events.map((event, idx) => (
-                <div key={`${event.id}-${idx}`} className="flex gap-4 pb-4">
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                      {eventIcons[event.eventType] ?? <Clock className="h-4 w-4" />}
-                    </div>
-                    {idx < events.length - 1 && <div className="h-full w-px bg-border" />}
+              {groupEventsIntoTurns(events).map((turn, turnIdx) => {
+                const isAgentTurn = turn.length > 0 && turn[0]!.eventType.startsWith("agent_");
+                return (
+                  <div key={`turn-${turnIdx}`} className={isAgentTurn ? "mb-3 rounded-lg border border-border/50 bg-muted/30 p-3" : "mb-2"}>
+                    {isAgentTurn && (
+                      <p className="mb-2 text-xs font-semibold text-muted-foreground">Turn {turnIdx + 1}</p>
+                    )}
+                    {turn.map((event, idx) => (
+                      <div key={`${event.id}-${idx}`} className="flex gap-4 pb-2">
+                        <div className="flex flex-col items-center">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
+                            {eventIcons[event.eventType] ?? <Clock className="h-3 w-3" />}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-medium ${isAgentEvent(event.eventType) ? "font-mono" : ""} ${event.eventType === "agent_text" ? "text-blue-300" : event.eventType === "agent_thinking" ? "text-purple-300" : ""}`}>
+                              {isAgentEvent(event.eventType)
+                                ? (event.payload?.content as string)?.slice(0, 80) ?? event.eventType.replace("agent_", "")
+                                : event.eventType.replace(/_/g, " ")}
+                            </p>
+                            <p className="text-xs text-muted-foreground shrink-0">
+                              {new Date(event.createdAt).toLocaleTimeString()}
+                            </p>
+                          </div>
+                          <AgentEventContent event={event} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-sm font-medium ${isAgentEvent(event.eventType) ? "font-mono" : ""} ${event.eventType === "agent_text" ? "text-blue-300" : event.eventType === "agent_thinking" ? "text-purple-300" : ""}`}>
-                        {isAgentEvent(event.eventType)
-                          ? (event.payload?.content as string)?.slice(0, 80) ?? event.eventType.replace("agent_", "")
-                          : event.eventType.replace(/_/g, " ")}
-                      </p>
-                      <p className="text-xs text-muted-foreground shrink-0">
-                        {new Date(event.createdAt).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    <AgentEventContent event={event} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={eventsEndRef} />
             </div>
           )}

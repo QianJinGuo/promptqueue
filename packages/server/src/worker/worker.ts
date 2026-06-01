@@ -2,6 +2,7 @@ import type { Task, RetryBackoff, ProviderAdapter, ProviderRequest, ProviderResp
 import type { TaskStore } from "../storage/task-store.js";
 import type { EventStore } from "../storage/event-store.js";
 import type { ProviderRegistry } from "../providers/registry.js";
+import type { ToolRegistry } from "../tools/registry.js";
 import { EventBus } from "./event-bus.js";
 import { TimeoutError } from "./errors.js";
 import { calculateBackoff } from "./retry.js";
@@ -22,6 +23,7 @@ export class Worker {
     private eventStore: EventStore,
     private eventBus: EventBus,
     private registry: ProviderRegistry,
+    private toolRegistry: ToolRegistry | null,
     private config: WorkerConfig
   ) {}
 
@@ -87,7 +89,13 @@ export class Worker {
         timeout: task.timeout,
       };
 
-      for await (const event of provider.executeAgent!(agentRequest, abortController.signal)) {
+      const toolExecutor = this.toolRegistry ? this.toolRegistry.createExecutor() : undefined;
+      if (toolExecutor && this.toolRegistry) {
+        agentRequest.tools = this.toolRegistry.getDefinitions();
+        agentRequest.maxTurns = agentRequest.maxTurns ?? 10;
+      }
+
+      for await (const event of provider.executeAgent!(agentRequest, abortController.signal, toolExecutor)) {
         this.eventBus.emit(task.id, event);
         this.eventStore.appendAgentEvent(task.id, event);
 

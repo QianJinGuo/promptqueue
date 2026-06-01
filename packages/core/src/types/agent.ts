@@ -1,8 +1,5 @@
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters?: Record<string, unknown>;
-}
+import type { ToolDefinition } from "./tools.js";
+export type { ToolDefinition };
 
 export interface AgentRequest {
   prompt: string;
