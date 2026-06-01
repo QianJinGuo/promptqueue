@@ -1,0 +1,30 @@
+server:
+  port: 9090
+  concurrency: 10
+  rateLimit:
+    windowMs: 60000
+    max: 100
+
+storage:
+  type: sqlite
+  path: ./data/promptqueue.db
+
+routing:
+  defaultStrategy: explicit
+  fallbackModel: mock-model
+
+providers:
+  anthropic:
+    apiKey: ${ANTHROPIC_API_KEY}
+    defaultModel: claude-sonnet-4-6
+  openai:
+      apiKey: ${OPENAI_API_KEY}
+      defaultModel: gpt-4o
+
+worker:
+  pollInterval: 500
+  retryBackoff: exponential
+  retryDelay: 1000
+  maxRetries: 3
+
+

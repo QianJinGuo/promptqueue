@@ -1,9 +1,10 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { tasks } from "./api/tasks.js";
 import { queues } from "./api/queues.js";
 import { providers } from "./api/providers.js";
 import { events } from "./api/events.js";
-import { errorHandler, createAuthMiddleware } from "./api/middleware/index.js";
+import { errorHandler, createAuthMiddleware, createRateLimitMiddleware } from "./api/middleware/index.js";
 import type { TaskStore } from "./storage/task-store.js";
 import type { EventStore } from "./storage/event-store.js";
 import type { ProviderRegistry } from "./providers/registry.js";
@@ -23,12 +24,15 @@ export function createApp(deps: {
   providerRegistry: ProviderRegistry;
   defaultModel: string;
   apiKey?: string;
+  rateLimit?: { windowMs: number; max: number };
 }) {
   const app = new Hono<AppEnv>();
 
   app.onError(errorHandler);
 
+  app.use("*", cors());
   app.use("*", createAuthMiddleware(deps.apiKey));
+  app.use("*", createRateLimitMiddleware(deps.rateLimit));
 
   app.use("*", async (c, next) => {
     c.set("taskStore", deps.taskStore);

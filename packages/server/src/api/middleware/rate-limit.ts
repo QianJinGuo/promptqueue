@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 
 export interface RateLimitOptions {
   /** Maximum requests per window per IP. Default: 100. */
-  maxRequests?: number;
+  max?: number;
   /** Window duration in milliseconds. Default: 60000 (1 minute). */
   windowMs?: number;
 }
@@ -21,7 +21,7 @@ interface RateLimitEntry {
 export function createRateLimitMiddleware(
   options: RateLimitOptions = {}
 ): MiddlewareHandler {
-  const { maxRequests = 100, windowMs = 60_000 } = options;
+  const { max = 100, windowMs = 60_000 } = options;
   const clients = new Map<string, RateLimitEntry>();
 
   // Periodic cleanup to prevent memory leaks
@@ -52,14 +52,14 @@ export function createRateLimitMiddleware(
 
     entry.count++;
 
-    const remaining = Math.max(0, maxRequests - entry.count);
+    const remaining = Math.max(0, max - entry.count);
     const resetSeconds = Math.ceil((entry.resetAt - now) / 1000);
 
-    c.header("X-RateLimit-Limit", String(maxRequests));
+    c.header("X-RateLimit-Limit", String(max));
     c.header("X-RateLimit-Remaining", String(remaining));
     c.header("X-RateLimit-Reset", String(resetSeconds));
 
-    if (entry.count > maxRequests) {
+    if (entry.count > max) {
       c.header("Retry-After", String(resetSeconds));
       return c.json(
         {

@@ -146,6 +146,10 @@ export interface QueueStats {
 export interface ServerConfig {
   port: number;
   concurrency: number;
+  rateLimit?: {
+    windowMs: number;
+    max: number;
+  };
 }
 
 export interface StorageConfig {

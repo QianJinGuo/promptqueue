@@ -28,8 +28,9 @@ export const PRIORITY_LEVELS = {
 
 export const DEFAULT_CONFIG = {
   server: {
-    port: 8080,
+    port: 9090,
     concurrency: 10,
+    rateLimit: { windowMs: 60_000, max: 100 },
   },
   storage: {
     type: "sqlite" as const,

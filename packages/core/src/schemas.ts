@@ -33,8 +33,12 @@ export type TaskQueryInput = z.infer<typeof taskQuerySchema>;
 
 export const configSchema = z.object({
   server: z.object({
-    port: z.coerce.number().int().positive().default(8080),
+    port: z.coerce.number().int().positive().default(9090),
     concurrency: z.coerce.number().int().positive().default(10),
+    rateLimit: z.object({
+      windowMs: z.coerce.number().int().positive().default(60_000),
+      max: z.coerce.number().int().positive().default(100),
+    }).default({}),
   }).default({}),
   storage: z.object({
     type: z.literal("sqlite").default("sqlite"),
