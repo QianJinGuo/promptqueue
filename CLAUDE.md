@@ -51,8 +51,9 @@ core (types, schemas, constants)
 
 Shared TypeScript types and Zod schemas. The source of truth for:
 - `Task`, `ProviderAdapter`, `ProviderRequest/Response`, `TaskEvent` interfaces
+- `ToolDefinition`, `ToolResult`, `ToolExecutorFn`, `ToolConfig` (tool loop types)
 - `createTaskSchema`, `taskQuerySchema`, `configSchema` (Zod validation)
-- `PRIORITY_LEVELS`, `TASK_STATUSES`, `DEFAULT_CONFIG` constants
+- `PRIORITY_LEVELS`, `TASK_STATUSES`, `DEFAULT_CONFIG`, `DEFAULT_TOOL_CONFIG` constants
 
 All other packages import types and schemas from here. Never duplicate type definitions in server or CLI.
 
@@ -63,12 +64,13 @@ All other packages import types and schemas from here. Never duplicate type defi
 Key layers:
 - **Storage** (`storage/`) — SQLite with WAL mode. `TaskStore` and `EventStore` wrap better-sqlite3. `claimNext()` uses `BEGIN IMMEDIATE` transaction for atomic task claiming. `task_events` table is append-only (immutable audit trail). Migrations auto-run on startup from `storage/migrations/` SQL files.
 - **API** (`api/`) — Hono routes. Each route file exports a Hono sub-app. All routes receive dependencies (stores, registry) via Hono's `c.set()`/`c.get()` context through middleware in `app.ts`. The `AppEnv` type in `app.ts` defines what's available.
-- **Worker** (`worker/`) — Polling loop. `claimNext()` -> `executeTask()` -> `updateStatus()`. Concurrency controlled by `activeCount` semaphore. Retries use exponential backoff with jitter (`retry.ts`). Callbacks are fire-and-forget via `fetch()`.
-- **Providers** (`providers/`) — `ProviderAdapter` interface from core. Each provider (anthropic, openai, mock) implements `execute()` and `healthCheck()`. `ProviderRegistry` maps model names to providers. `pricing.ts` has per-model token pricing.
+- **Worker** (`worker/`) — Polling loop. `claimNext()` -> `executeTask()` -> `updateStatus()`. Concurrency controlled by `activeCount` semaphore. `executeTaskStreaming()` passes `toolExecutor` callback from `ToolRegistry` to providers that support `executeAgent()`. Retries use exponential backoff with jitter (`retry.ts`). Callbacks are fire-and-forget via `fetch()`.
+- **Providers** (`providers/`) — `ProviderAdapter` interface from core. Each provider (anthropic, openai, mock, anthropic-sdk) implements `execute()` and `healthCheck()`. `AnthropicSDKProvider` also implements `executeAgent()` for the multi-turn tool loop via `@anthropic-ai/sdk`. `ProviderRegistry` maps model names to providers. `pricing.ts` has per-model token pricing.
+- **Tools** (`tools/`) — `ToolRegistry` manages built-in tools with whitelist/blacklist governance and timeout enforcement. Built-in tools: `execute_command` (shell execution with allowed-commands filter), `read_file` (with offset/limit and path protection), `write_file` (with 1MB size limit and path protection). All tools return `ToolResult` and never throw.
 - **Config** (`config/`) — YAML file loader with env var interpolation (`${VAR_NAME}`). Custom YAML parser (no js-yaml dependency). Merges with `DEFAULT_CONFIG` and validates via `configSchema`.
 - **Logging** (`logging.ts`) — Structured JSON logger singleton. Writes to stdout/stderr. No `console.log` in production code.
 
-Server entry (`index.ts`): Creates DB, stores, registry, worker, Hono app. Registers mock provider by default. Graceful shutdown on SIGTERM/SIGINT: stop worker -> close HTTP server -> close DB, with 30s timeout.
+Server entry (`index.ts`): Creates DB, stores, registry, worker, Hono app. Registers providers (API, CLI, and anthropic-sdk types). Creates `ToolRegistry` and registers built-in tools if `tools` config is present. Worker receives `toolRegistry` for tool loop support. Graceful shutdown on SIGTERM/SIGINT: stop worker -> close HTTP server -> close DB, with 30s timeout.
 
 ### @promptqueue/cli
 
@@ -88,7 +90,11 @@ Next.js 15 App Router with shadcn/ui (zinc color, CSS variables). Dark mode only
 
 **Priority ordering** — Priority 1 (critical) through 5 (best-effort). `claimNext()` orders by `priority ASC, created_at ASC`. Lower number = higher priority.
 
-**Provider registration** — Providers are registered in `index.ts` at server startup. To add a provider: create file in `providers/`, implement `ProviderAdapter`, register in `index.ts`, add pricing to `pricing.ts`.
+**Provider registration** — Providers are registered in `index.ts` at server startup. To add a provider: create file in `providers/`, implement `ProviderAdapter`, register in `index.ts`, add pricing to `pricing.ts`. For tool loop support, implement `executeAgent()` with `toolExecutor` callback parameter.
+
+**Tool loop** — Worker owns tool execution. When a provider returns `tool_use`, Worker intercepts via `toolExecutor` callback, runs it through `ToolRegistry` (governance check + execution), and injects the result back into the LLM conversation. This loops up to `maxTurns` (default 10). Enable per-task with `--tools` CLI flag or `tools.enabled` in task creation.
+
+**Tool governance** — `ToolRegistry.isAllowed()` checks denied list first (prefix match), then allowed list. Empty allowed list means all registered tools are permitted (except denied). Tools never throw — errors are returned as `ToolResult.isError = true`.
 
 **Test setup** — Server tests use in-memory SQLite (`:memory:`) via `createDatabase()`. The Hono `app.request()` method is used for API testing without starting an HTTP server. CLI tests mock `globalThis.fetch` and `process.exit`.
 

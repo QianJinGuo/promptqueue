@@ -43,8 +43,9 @@ core
 Shared types, Zod schemas, and constants. Treat this package as the source of truth for:
 
 - `Task`, `ProviderAdapter`, `ProviderRequest`, `ProviderResponse`, `TaskEvent`
+- `ToolDefinition`, `ToolResult`, `ToolExecutorFn`, `ToolConfig` (tool loop types)
 - `createTaskSchema`, `taskQuerySchema`, `configSchema`
-- `PRIORITY_LEVELS`, `TASK_STATUSES`, `DEFAULT_CONFIG`
+- `PRIORITY_LEVELS`, `TASK_STATUSES`, `DEFAULT_CONFIG`, `DEFAULT_TOOL_CONFIG`
 
 Do not duplicate core types in other packages.
 
@@ -57,8 +58,9 @@ Important constraints and structure:
 - `better-sqlite3` is synchronous. DB operations are sync even though provider execution is async.
 - `storage/` contains the SQLite-backed stores. When adding fields, update both SQL and row-mapping code.
 - `api/` exports Hono sub-apps mounted from `app.ts`.
-- `worker/` runs the polling loop: claim -> execute -> update status.
-- `providers/` contains implementations of the shared `ProviderAdapter` contract.
+- `worker/` runs the polling loop: claim -> execute -> update status. `executeTaskStreaming()` passes `toolExecutor` callback to providers that support `executeAgent()`.
+- `providers/` contains implementations of the shared `ProviderAdapter` contract. `AnthropicSDKProvider` implements the multi-turn tool loop via `@anthropic-ai/sdk`.
+- `tools/` contains the `ToolRegistry` and built-in tools (`execute_command`, `read_file`, `write_file`). Tools are registered at startup and governed by whitelist/blacklist config.
 - `config/` loads YAML, interpolates env vars, merges defaults, then validates.
 - `logging.ts` is the structured logger entrypoint; avoid ad hoc production logging.
 
@@ -88,6 +90,9 @@ Next.js 15 App Router UI. Uses shadcn/ui and dark mode only. API access lives in
 - Preserve the API response envelope shape across server routes
 - Keep storage changes consistent across migrations, stores, and model mapping helpers
 - Register new providers in server startup and update pricing where relevant
+- Register new built-in tools in `index.ts` startup and add them to `DEFAULT_TOOL_CONFIG`
+- Built-in tools must never throw — return `ToolResult` with `isError: true` on failure
+- File tools must use `resolve()` + allowed-paths prefix matching to prevent path traversal
 - Follow existing package boundaries instead of moving logic across workspaces casually
 
 ## Testing guidance

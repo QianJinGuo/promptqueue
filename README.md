@@ -31,12 +31,15 @@ The server starts on port 9090 with a SQLite-backed queue, an embedded worker, a
 - **Async task submission** -- submit prompts and poll for results; never block on an API call
 - **Priority queues** -- five priority levels (critical, high, normal, low, best-effort) with FIFO ordering within each level
 - **Multi-provider support** -- Anthropic, OpenAI, Google Gemini, and LiteLLM proxy; provider-as-plugin architecture for community adapters
+- **Tool loop** -- Worker-owned tool execution with multi-turn agent loops; LLM calls tools, Worker governs and executes them
+- **Built-in tools** -- `execute_command`, `read_file`, `write_file` with security controls (allowed paths, command whitelists, size limits)
+- **Tool governance** -- whitelist/blacklist filtering, timeout enforcement, and audit trail for every tool call
 - **Token tracking** -- input and output token counts recorded for every task
 - **Cost estimation** -- per-task USD cost calculated from provider pricing tables
 - **Retry with exponential backoff** -- configurable retry policy with jitter
-- **Server-Sent Events** -- real-time task status streaming
+- **Server-Sent Events** -- real-time task status streaming with agent event details
 - **Webhooks** -- callback URLs notified on task completion
-- **Dark-mode dashboard** -- built with Next.js, Tailwind CSS, and shadcn/ui
+- **Dark-mode dashboard** -- built with Next.js, Tailwind CSS, and shadcn/ui; turn-grouped agent event visualization
 
 ## Architecture
 
@@ -108,6 +111,9 @@ promptqueue serve --port 9090 --concurrency 10
 # Submit a task
 promptqueue submit "Summarize this article" --model claude-sonnet-4-6 --priority 2
 
+# Submit a task with tool loop enabled
+promptqueue submit "List all TypeScript files in src" --model claude-sonnet-4-6 --tools
+
 # Check task status
 promptqueue status t_abc123
 
@@ -132,6 +138,10 @@ providers:
   anthropic:
     apiKey: ${ANTHROPIC_API_KEY}
     defaultModel: claude-sonnet-4-6
+  anthropic-sdk:
+    type: anthropic-sdk
+    apiKey: ${ANTHROPIC_API_KEY}
+    defaultModel: claude-sonnet-4-6
   openai:
     apiKey: ${OPENAI_API_KEY}
     defaultModel: gpt-4.1
@@ -148,6 +158,15 @@ worker:
   retryBackoff: exponential
   retryDelay: 1000
   maxRetries: 3
+
+tools:
+  allowed:
+    - execute_command
+    - read_file
+    - write_file
+  denied: []
+  maxTurns: 10
+  timeout: 30
 ```
 
 ## Provider Setup

@@ -105,12 +105,26 @@ providers:
   #   type: cli
   #   command: claude
   #   defaultModel: claude-sonnet-4-6
+  # anthropic-sdk:
+  #   type: anthropic-sdk
+  #   apiKey: ${ANTHROPIC_API_KEY}
+  #   defaultModel: claude-sonnet-4-6
 
 worker:
   pollInterval: 500
   retryBackoff: exponential
   retryDelay: 1000
   maxRetries: 3
+
+# Enable built-in tools for agent tool loop
+# tools:
+#   allowed:
+#     - execute_command
+#     - read_file
+#     - write_file
+#   denied: []
+#   maxTurns: 10
+#   timeout: 30
 ```
 
 Create the data directory:
@@ -161,6 +175,9 @@ pnpm submit "Hello"
 curl -X POST http://localhost:9090/api/v1/tasks \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Explain quantum computing","model":"claude-sonnet-4-6"}'
+
+# Submit a task with tool loop enabled (requires anthropic-sdk provider and tools config)
+pnpm submit "List all TypeScript files in the src directory" --model claude-sonnet-4-6 --tools
 ```
 
 ---
@@ -202,6 +219,7 @@ pnpm serve --port 8080                        # override port
 pnpm submit "Summarize this article"
 pnpm submit "Translate to French" --model gpt-4o
 pnpm submit "Debug this code" --priority 1 --system-prompt "You are a debugger"
+pnpm submit "List files in src" --model claude-sonnet-4-6 --tools
 
 # Check task status
 pnpm pq-status t_01ABCDEF
@@ -243,7 +261,7 @@ curl http://localhost:9090/api/v1/providers
 
 ## 5. Provider types
 
-PromptQueue supports two provider types:
+PromptQueue supports three provider types:
 
 ### API providers (in-process SDK calls)
 
@@ -258,6 +276,20 @@ providers:
     apiKey: ${OPENAI_API_KEY}
     defaultModel: gpt-4o
 ```
+
+### SDK providers (tool loop support)
+
+Use `@anthropic-ai/sdk` directly for multi-turn tool loop control. The Worker owns tool execution and governance. Configured with `type: anthropic-sdk`:
+
+```yaml
+providers:
+  anthropic-sdk:
+    type: anthropic-sdk
+    apiKey: ${ANTHROPIC_API_KEY}
+    defaultModel: claude-sonnet-4-6
+```
+
+SDK providers support the `--tools` CLI flag for enabling built-in tools (execute_command, read_file, write_file).
 
 ### CLI providers (subprocess agent tools)
 
@@ -281,6 +313,8 @@ CLI providers support streaming agent events and automatic timeout handling via 
 - **Migrations** run automatically on server startup — new columns are added without manual intervention
 - **Rate limiting** is enabled by default (100 requests/minute) when using `pnpm serve`
 - **Retry backoff** uses exponential strategy by default with configurable delays
+- **Tool loop** enables multi-turn agent execution when `--tools` flag is used with an `anthropic-sdk` provider; Worker governs tool calls via whitelist/blacklist
+- **Built-in tools** (`execute_command`, `read_file`, `write_file`) are available when `tools` config is present
 - **Task timeout** defaults to 300 seconds; tasks exceeding it transition to `timed_out` status
 - Starting the built server directly with `node packages/server/dist/index.js` uses **in-memory** storage
 - The dashboard is **not** embedded — it runs separately on port 3000
