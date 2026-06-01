@@ -27,6 +27,7 @@ interface TaskRow {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  next_retry_at: number | null;
 }
 
 function rowToTask(row: TaskRow): Task {
@@ -56,6 +57,7 @@ function rowToTask(row: TaskRow): Task {
     createdAt: row.created_at,
     startedAt: row.started_at ?? undefined,
     completedAt: row.completed_at ?? undefined,
+    nextRetryAt: row.next_retry_at ?? undefined,
   };
 }
 
@@ -74,6 +76,7 @@ export interface StatusTransitionPayload {
   outputTokens?: number;
   costUsd?: number;
   retryCount?: number;
+  nextRetryAt?: number | null;
 }
 
 export class TaskStore {
@@ -218,6 +221,10 @@ export class TaskStore {
         updates.push("retry_count = ?");
         values.push(payload.retryCount);
       }
+      if (payload.nextRetryAt !== undefined) {
+        updates.push("next_retry_at = ?");
+        values.push(payload.nextRetryAt);
+      }
 
       values.push(id);
 
@@ -240,21 +247,23 @@ export class TaskStore {
 
   claimNext(): Task | null {
     const claim = this.db.transaction(() => {
+      const now = Date.now();
       const row = this.db
         .prepare(
           `SELECT id FROM tasks
            WHERE status = 'pending'
+             AND (next_retry_at IS NULL OR next_retry_at <= ?)
            ORDER BY priority ASC, created_at ASC
            LIMIT 1`
         )
-        .get() as { id: string } | undefined;
+        .get(now) as { id: string } | undefined;
 
       if (!row) return null;
 
-      const now = new Date().toISOString();
+      const startedAt = new Date().toISOString();
       this.db
-        .prepare(`UPDATE tasks SET status = 'running', started_at = ? WHERE id = ? AND status = 'pending'`)
-        .run(now, row.id);
+        .prepare(`UPDATE tasks SET status = 'running', started_at = ?, next_retry_at = NULL WHERE id = ? AND status = 'pending'`)
+        .run(startedAt, row.id);
 
       this.db
         .prepare(
