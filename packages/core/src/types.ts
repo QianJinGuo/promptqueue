@@ -46,7 +46,7 @@ export interface Task {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-  nextRetryAt?: string | null;
+  nextRetryAt?: number | null;
 }
 
 // --- Provider Types ---
