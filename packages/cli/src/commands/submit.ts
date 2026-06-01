@@ -7,6 +7,7 @@ interface SubmitOptions {
   temperature?: number;
   callbackUrl?: string;
   apiUrl?: string;
+  tools?: boolean;
 }
 
 export async function submitTask(prompt: string, options: SubmitOptions): Promise<void> {
