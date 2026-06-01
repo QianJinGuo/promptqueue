@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && rm -rf dist/storage/migrations && cp -r src/storage/migrations dist/storage/migrations",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
     "lint": "tsc --noEmit",

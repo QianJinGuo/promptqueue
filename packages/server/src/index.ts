@@ -8,6 +8,7 @@ import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import { ClaudeCodeProvider } from "./providers/claude-code.js";
 import { Worker } from "./worker/worker.js";
+import { EventBus } from "./worker/event-bus.js";
 import { createApp } from "./app.js";
 import { DEFAULT_CONFIG, type AppConfig } from "@promptqueue/core";
 import { logger } from "./logging.js";
@@ -36,6 +37,7 @@ export function startServer(options: ServerOptions = {}): void {
 
   const taskStore = new TaskStore(db);
   const eventStore = new EventStore(db);
+  const eventBus = new EventBus();
 
   const registry = new ProviderRegistry();
 
@@ -62,14 +64,20 @@ export function startServer(options: ServerOptions = {}): void {
   }
 
   // Register CLI providers
+  let firstCliProvider: string | null = null;
   for (const [providerName, providerConfig] of Object.entries(providers)) {
     if (providerConfig.type === "cli" && providerConfig.command) {
       const CliClass = providerName === "claude-code" ? ClaudeCodeProvider : null;
       if (CliClass) {
-        registry.register(new CliClass({
+        const instance = new CliClass({
           command: providerConfig.command,
           defaultModel: providerConfig.defaultModel,
-        }));
+        });
+        registry.register(instance);
+        if (!firstCliProvider) {
+          registry.setFallback(instance);
+          firstCliProvider = providerName;
+        }
         log(`Registered CLI provider: ${providerName}`);
       }
     }
@@ -77,7 +85,7 @@ export function startServer(options: ServerOptions = {}): void {
 
   registry.register(new MockProvider());
 
-  const worker = new Worker(taskStore, registry, {
+  const worker = new Worker(taskStore, eventStore, eventBus, registry, {
     concurrency,
     pollInterval: config.worker.pollInterval,
     retryBackoff: config.worker.retryBackoff,
@@ -87,6 +95,7 @@ export function startServer(options: ServerOptions = {}): void {
   const app = createApp({
     taskStore,
     eventStore,
+    eventBus,
     providerRegistry: registry,
     defaultModel: config.routing.fallbackModel,
     apiKey: options.apiKey,

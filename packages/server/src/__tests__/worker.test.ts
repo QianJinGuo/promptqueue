@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Worker } from '../worker/worker.js';
 import { TaskStore } from '../storage/task-store.js';
+import { EventStore } from '../storage/event-store.js';
 import { ProviderRegistry } from '../providers/registry.js';
 import { MockProvider } from '../providers/mock.js';
 import { createDatabase, runMigrations, closeDatabase } from '../storage/database.js';
+import { EventBus } from '../worker/event-bus.js';
 import { calculateBackoff } from '../worker/retry.js';
 
 class AuthenticationError extends Error {
@@ -16,12 +18,16 @@ class AuthenticationError extends Error {
 describe('Worker', () => {
   let db: ReturnType<typeof createDatabase>;
   let store: TaskStore;
+  let eventStore: EventStore;
+  let eventBus: EventBus;
   let registry: ProviderRegistry;
 
   beforeEach(() => {
     db = createDatabase({ path: ':memory:' });
     runMigrations(db);
     store = new TaskStore(db);
+    eventStore = new EventStore(db);
+    eventBus = new EventBus();
     registry = new ProviderRegistry();
     registry.register(new MockProvider());
   });
@@ -49,7 +55,7 @@ describe('Worker', () => {
       healthCheck: () => Promise.resolve({ status: 'healthy', latencyMs: 0 }),
     });
 
-    const worker = new Worker(store, slowRegistry, {
+    const worker = new Worker(store, eventStore, eventBus, slowRegistry, {
       concurrency: 1,
       pollInterval: 50,
       retryBackoff: 'exponential',
@@ -84,7 +90,7 @@ describe('Worker', () => {
       healthCheck: () => Promise.resolve({ status: 'healthy', latencyMs: 0 }),
     });
 
-    const worker = new Worker(store, failRegistry, {
+    const worker = new Worker(store, eventStore, eventBus, failRegistry, {
       concurrency: 1,
       pollInterval: 50,
       retryBackoff: 'exponential',
@@ -119,7 +125,7 @@ describe('Worker', () => {
       healthCheck: () => Promise.resolve({ status: 'healthy', latencyMs: 0 }),
     });
 
-    const worker = new Worker(store, failRegistry, {
+    const worker = new Worker(store, eventStore, eventBus, failRegistry, {
       concurrency: 1,
       pollInterval: 50,
       retryBackoff: 'exponential',

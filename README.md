@@ -10,7 +10,7 @@ Submit prompt tasks, get a task ID, and receive results via polling, SSE, or web
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/promptqueue.git
+git clone https://github.com/QianJinGuo/promptqueue.git
 cd promptqueue
 pnpm install
 pnpm build
@@ -24,7 +24,7 @@ pnpm build
 node packages/server/dist/index.js
 ```
 
-The server starts on port 8080 with a SQLite-backed queue, an embedded worker, and a dark-mode dashboard. Submit tasks via the CLI, HTTP API, or the dashboard UI.
+The server starts on port 9090 with a SQLite-backed queue, an embedded worker, and a dark-mode dashboard. Submit tasks via the CLI, HTTP API, or the dashboard UI.
 
 ## Features
 
@@ -62,7 +62,7 @@ The server starts on port 8080 with a SQLite-backed queue, an embedded worker, a
 ### Submit a task
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/tasks \
+curl -X POST http://localhost:9090/api/v1/tasks \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-..." \
   -d '{
@@ -79,7 +79,7 @@ Response: `202 Accepted` with task ID and status `pending`.
 ### Check task status
 
 ```bash
-curl http://localhost:8080/api/v1/tasks/t_01HXYZABCDEF \
+curl http://localhost:9090/api/v1/tasks/t_01HXYZABCDEF \
   -H "Authorization: Bearer sk-..."
 ```
 
@@ -88,14 +88,14 @@ Response includes `status`, `result` (when completed), `tokenUsage`, and `cost`.
 ### List tasks
 
 ```bash
-curl "http://localhost:8080/api/v1/tasks?status=pending&priority=1" \
+curl "http://localhost:9090/api/v1/tasks?status=pending&priority=1" \
   -H "Authorization: Bearer sk-..."
 ```
 
 ### Cancel a task
 
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/tasks/t_01HXYZABCDEF \
+curl -X DELETE http://localhost:9090/api/v1/tasks/t_01HXYZABCDEF \
   -H "Authorization: Bearer sk-..."
 ```
 
@@ -103,7 +103,7 @@ curl -X DELETE http://localhost:8080/api/v1/tasks/t_01HXYZABCDEF \
 
 ```bash
 # Start the server (API + worker + dashboard)
-promptqueue serve --port 8080 --concurrency 10
+promptqueue serve --port 9090 --concurrency 10
 
 # Submit a task
 promptqueue submit "Summarize this article" --model claude-sonnet-4-6 --priority 2
@@ -121,7 +121,7 @@ Create `~/.promptqueue/config.yaml`:
 
 ```yaml
 server:
-  port: 8080
+  port: 9090
   concurrency: 10
 
 storage:
@@ -166,7 +166,7 @@ API keys are never logged and are validated at startup.
 
 ## Dashboard
 
-PromptQueue includes a dark-mode dashboard built with Next.js 15, Tailwind CSS, and shadcn/ui. Access it at `http://localhost:8080` when the server is running.
+PromptQueue includes a dark-mode dashboard built with Next.js 15, Tailwind CSS, and shadcn/ui. Access it at `http://localhost:9090` when the server is running.
 
 Screens:
 - **Overview** -- live queue depth, throughput, success rate, recent tasks

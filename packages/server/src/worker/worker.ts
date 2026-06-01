@@ -1,6 +1,8 @@
-import type { Task, RetryBackoff, ProviderAdapter, ProviderRequest, ProviderResponse } from "@promptqueue/core";
+import type { Task, RetryBackoff, ProviderAdapter, ProviderRequest, ProviderResponse, AgentRequest, AgentEvent } from "@promptqueue/core";
 import type { TaskStore } from "../storage/task-store.js";
+import type { EventStore } from "../storage/event-store.js";
 import type { ProviderRegistry } from "../providers/registry.js";
+import { EventBus } from "./event-bus.js";
 import { TimeoutError } from "./errors.js";
 import { calculateBackoff } from "./retry.js";
 
@@ -17,6 +19,8 @@ export class Worker {
 
   constructor(
     private store: TaskStore,
+    private eventStore: EventStore,
+    private eventBus: EventBus,
     private registry: ProviderRegistry,
     private config: WorkerConfig
   ) {}
@@ -54,8 +58,90 @@ export class Worker {
   }
 
   private async executeTask(task: Task): Promise<void> {
+    const provider = this.registry.resolve(task.model);
+
+    if (typeof provider.executeAgent === "function") {
+      await this.executeTaskStreaming(provider, task);
+    } else {
+      await this.executeTaskLegacy(provider, task);
+    }
+  }
+
+  private async executeTaskStreaming(
+    provider: ProviderAdapter,
+    task: Task
+  ): Promise<void> {
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), task.timeout * 1000);
+
+    let finalResponse: ProviderResponse | undefined;
+    let errorMessage: string | undefined;
+
     try {
-      const provider = this.registry.resolve(task.model);
+      const agentRequest: AgentRequest = {
+        prompt: task.prompt,
+        systemPrompt: task.systemPrompt,
+        model: task.model,
+        maxTokens: task.maxTokens,
+        temperature: task.temperature,
+        timeout: task.timeout,
+      };
+
+      for await (const event of provider.executeAgent!(agentRequest, abortController.signal)) {
+        this.eventBus.emit(task.id, event);
+        this.eventStore.appendAgentEvent(task.id, event);
+
+        if (event.type === "completed") {
+          finalResponse = event.response;
+          break;
+        }
+        if (event.type === "error") {
+          errorMessage = event.error;
+          break;
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof TimeoutError) {
+        this.store.updateStatus(task.id, "timed_out", { error: "Task exceeded timeout" });
+        this.eventBus.emit(task.id, { type: "error", error: "Task exceeded timeout" });
+        this.fireCallback(task, "timed_out");
+        return;
+      }
+      errorMessage = err instanceof Error ? err.message : String(err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (finalResponse) {
+      this.store.updateStatus(task.id, "completed", {
+        result: finalResponse.result,
+        inputTokens: finalResponse.inputTokens,
+        outputTokens: finalResponse.outputTokens,
+        costUsd: finalResponse.costUsd,
+      });
+      this.fireCallback(task, "completed");
+    } else if (errorMessage) {
+      // Check retryability — errors from executeAgent may be generic strings
+      // so we use the same logic as the legacy path
+      const isAuthError = /authentication|permission|auth.*error|invalid.*api.*key/i.test(errorMessage);
+      if (!isAuthError && task.retryCount < task.maxRetries) {
+        const delay = calculateBackoff(task.retryCount, this.config.retryBackoff, this.config.retryDelay);
+        this.store.updateStatus(task.id, "pending", {
+          retryCount: task.retryCount + 1,
+          nextRetryAt: Date.now() + delay,
+        });
+      } else {
+        this.store.updateStatus(task.id, "failed", { error: errorMessage });
+        this.fireCallback(task, "failed");
+      }
+    }
+  }
+
+  private async executeTaskLegacy(
+    provider: ProviderAdapter,
+    task: Task
+  ): Promise<void> {
+    try {
       const result = await this.executeWithTimeout(provider, {
         prompt: task.prompt,
         systemPrompt: task.systemPrompt,
@@ -82,22 +168,26 @@ export class Worker {
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      const retryable = this.isRetryable(error);
+      await this.handleTaskError(task, message);
+    }
+  }
 
-      if (retryable && task.retryCount < task.maxRetries) {
-        const delay = calculateBackoff(
-          task.retryCount,
-          this.config.retryBackoff,
-          this.config.retryDelay
-        );
-        this.store.updateStatus(task.id, "pending", {
-          retryCount: task.retryCount + 1,
-          nextRetryAt: Date.now() + delay,
-        });
-      } else {
-        this.store.updateStatus(task.id, "failed", { error: message });
-        this.fireCallback(task, "failed");
-      }
+  private async handleTaskError(task: Task, message: string): Promise<void> {
+    const retryable = this.isRetryable(new Error(message));
+
+    if (retryable && task.retryCount < task.maxRetries) {
+      const delay = calculateBackoff(
+        task.retryCount,
+        this.config.retryBackoff,
+        this.config.retryDelay
+      );
+      this.store.updateStatus(task.id, "pending", {
+        retryCount: task.retryCount + 1,
+        nextRetryAt: Date.now() + delay,
+      });
+    } else {
+      this.store.updateStatus(task.id, "failed", { error: message });
+      this.fireCallback(task, "failed");
     }
   }
 
@@ -126,7 +216,12 @@ export class Worker {
   private isRetryable(error: unknown): boolean {
     if (error instanceof Error) {
       const name = error.constructor.name;
-      return !["AuthenticationError", "PermissionDeniedError", "NotFoundError"].includes(name);
+      if (["AuthenticationError", "PermissionDeniedError", "NotFoundError"].includes(name)) {
+        return false;
+      }
+      if (/authentication|permission|auth.*error|invalid.*api.*key/i.test(error.message)) {
+        return false;
+      }
     }
     return true;
   }
@@ -139,7 +234,7 @@ export class Worker {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event, task }),
     }).catch(() => {
-      // Fire-and-forget: log failure but don't block
+      // Fire-and-forget
     });
   }
 }

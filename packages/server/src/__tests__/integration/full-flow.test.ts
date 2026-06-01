@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 type AnyJson = any;
 import BetterSqlite3 from "better-sqlite3";
 import { createApp } from "../../app.js";
+import { EventBus } from "../../worker/event-bus.js";
 import { TaskStore } from "../../storage/task-store.js";
 import { EventStore } from "../../storage/event-store.js";
 import { ProviderRegistry } from "../../providers/registry.js";
@@ -36,7 +37,8 @@ function setupTestApp() {
       cost_usd REAL,
       created_at TEXT NOT NULL,
       started_at TEXT,
-      completed_at TEXT
+      completed_at TEXT,
+      next_retry_at INTEGER DEFAULT NULL
     );
     CREATE INDEX idx_tasks_status_priority ON tasks(status, priority, created_at);
     CREATE INDEX idx_tasks_queue ON tasks(queue, status);
@@ -58,6 +60,7 @@ function setupTestApp() {
   const app = createApp({
     taskStore,
     eventStore,
+    eventBus: new EventBus(),
     providerRegistry: registry,
     defaultModel: "mock-model",
   });

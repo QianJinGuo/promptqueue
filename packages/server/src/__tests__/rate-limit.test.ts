@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createApp } from '../app.js';
+import { EventBus } from '../worker/event-bus.js';
 import { createDatabase, runMigrations } from '../storage/database.js';
 import { TaskStore } from '../storage/task-store.js';
 import { EventStore } from '../storage/event-store.js';
@@ -20,6 +21,7 @@ describe('Rate limiting', () => {
     app = createApp({
       taskStore,
       eventStore,
+      eventBus: new EventBus(),
       providerRegistry: registry,
       defaultModel: 'mock-model',
       rateLimit: { windowMs: 1000, max: 5 },

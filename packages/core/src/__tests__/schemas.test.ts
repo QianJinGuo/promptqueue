@@ -111,7 +111,7 @@ describe("taskQuerySchema", () => {
 describe("configSchema", () => {
   test("provides defaults for empty input", () => {
     const result = configSchema.parse({});
-    expect(result.server.port).toBe(8080);
+    expect(result.server.port).toBe(9090);
     expect(result.server.concurrency).toBe(10);
     expect(result.storage.type).toBe("sqlite");
     expect(result.routing.defaultStrategy).toBe("explicit");

@@ -8,11 +8,13 @@ import { errorHandler, createAuthMiddleware, createRateLimitMiddleware } from ".
 import type { TaskStore } from "./storage/task-store.js";
 import type { EventStore } from "./storage/event-store.js";
 import type { ProviderRegistry } from "./providers/registry.js";
+import type { EventBus } from "./worker/event-bus.js";
 
 export interface AppEnv {
   Variables: {
     taskStore: TaskStore;
     eventStore: EventStore;
+    eventBus: EventBus;
     providerRegistry: ProviderRegistry;
     defaultModel: string;
   };
@@ -21,6 +23,7 @@ export interface AppEnv {
 export function createApp(deps: {
   taskStore: TaskStore;
   eventStore: EventStore;
+  eventBus: EventBus;
   providerRegistry: ProviderRegistry;
   defaultModel: string;
   apiKey?: string;
@@ -37,6 +40,7 @@ export function createApp(deps: {
   app.use("*", async (c, next) => {
     c.set("taskStore", deps.taskStore);
     c.set("eventStore", deps.eventStore);
+    c.set("eventBus", deps.eventBus);
     c.set("providerRegistry", deps.providerRegistry);
     c.set("defaultModel", deps.defaultModel);
     return next();
@@ -48,9 +52,9 @@ export function createApp(deps: {
 
   const api = new Hono<AppEnv>();
   api.route("/tasks", tasks);
+  api.route("/tasks", events);
   api.route("/queues", queues);
   api.route("/providers", providers);
-  api.route("/", events);
 
   app.route("/api/v1", api);
 

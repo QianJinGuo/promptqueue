@@ -7,7 +7,7 @@ interface ListOptions {
 }
 
 export async function listTasks(options: ListOptions): Promise<void> {
-  const apiUrl = options.apiUrl ?? "http://localhost:8080";
+  const apiUrl = options.apiUrl ?? "http://localhost:9090";
 
   const params = new URLSearchParams();
   if (options.status) params.set("status", options.status);

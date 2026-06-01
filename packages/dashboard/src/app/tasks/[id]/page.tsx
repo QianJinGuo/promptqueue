@@ -1,22 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
-import { getTask, cancelTask, getTaskEvents } from "@/lib/api-client";
-import type { Task, TaskEvent } from "@promptqueue/core";
+import { getTask, cancelTask, subscribeToTaskEvents } from "@/lib/api-client";
+import type { Task, TaskEvent, TaskEventType } from "@promptqueue/core";
 import {
   ArrowLeft,
   AlertCircle,
@@ -25,6 +17,9 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  MessageSquare,
+  Terminal,
+  Wrench,
 } from "lucide-react";
 
 const eventIcons: Record<string, React.ReactNode> = {
@@ -35,7 +30,65 @@ const eventIcons: Record<string, React.ReactNode> = {
   retrying: <RefreshCw className="h-4 w-4 text-yellow-500" />,
   cancelled: <XCircle className="h-4 w-4 text-muted-foreground" />,
   timed_out: <XCircle className="h-4 w-4 text-destructive" />,
+  agent_text: <MessageSquare className="h-4 w-4 text-blue-500" />,
+  agent_thinking: <MessageSquare className="h-4 w-4 text-purple-500" />,
+  agent_tool_call: <Wrench className="h-4 w-4 text-yellow-600" />,
+  agent_tool_result: <Terminal className="h-4 w-4 text-green-600" />,
 };
+
+function AgentEventContent({ event }: { event: TaskEvent }) {
+  const payload = event.payload ?? {};
+
+  if (event.eventType === "agent_text") {
+    return (
+      <div className="mt-1 rounded bg-blue-500/10 p-2 font-mono text-xs text-blue-200 whitespace-pre-wrap">
+        {typeof payload.content === "string" ? payload.content : JSON.stringify(payload.content)}
+      </div>
+    );
+  }
+
+  if (event.eventType === "agent_thinking") {
+    return (
+      <div className="mt-1 rounded bg-purple-500/10 p-2 italic text-xs text-purple-300 whitespace-pre-wrap">
+        {typeof payload.content === "string" ? payload.content : JSON.stringify(payload.content)}
+      </div>
+    );
+  }
+
+  if (event.eventType === "agent_tool_call") {
+    return (
+      <div className="mt-1 rounded bg-yellow-500/10 p-2 text-xs">
+        <span className="font-semibold text-yellow-400">{String(payload.name ?? "unknown")}</span>
+        <pre className="mt-1 overflow-x-auto text-muted-foreground">
+          {JSON.stringify(payload.args, null, 2)}
+        </pre>
+      </div>
+    );
+  }
+
+  if (event.eventType === "agent_tool_result") {
+    return (
+      <details className="mt-1 rounded bg-green-500/10 p-2 text-xs">
+        <summary className="cursor-pointer font-semibold text-green-400">
+          {String(payload.name ?? "unknown")} — result
+        </summary>
+        <pre className="mt-1 overflow-x-auto text-muted-foreground">
+          {JSON.stringify(payload.result, null, 2)}
+        </pre>
+      </details>
+    );
+  }
+
+  if (payload && Object.keys(payload).length > 0) {
+    return (
+      <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
+        {JSON.stringify(payload, null, 2)}
+      </pre>
+    );
+  }
+
+  return null;
+}
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -46,16 +99,13 @@ export default function TaskDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const eventsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [taskData, eventsData] = await Promise.all([
-          getTask(id),
-          getTaskEvents(id),
-        ]);
+        const taskData = await getTask(id);
         setTask(taskData);
-        setEvents(eventsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load task");
       } finally {
@@ -63,7 +113,43 @@ export default function TaskDetailPage() {
       }
     }
     load();
+
+    const es = subscribeToTaskEvents(id, (streamEvent) => {
+      // streamEvent.data has two shapes coming from server (events.ts):
+      //   - Historical backfill: entire TaskEvent {id, taskId, eventType, payload, createdAt}
+      //   - Real-time: entire AgentEvent {type, content} or {type, name, args}
+      // Normalize: prefer inner .payload (historical shape); fall back to data itself (realtime shape).
+      const rawData = streamEvent.data as Record<string, unknown> | undefined;
+      const payload =
+        rawData && "payload" in rawData && typeof rawData.payload === "object" && rawData.payload !== null
+          ? (rawData.payload as Record<string, unknown>)
+          : (rawData ?? undefined);
+      const taskEvent: TaskEvent = {
+        id: Date.now(),
+        taskId: id,
+        eventType: streamEvent.type as TaskEventType,
+        payload,
+        createdAt: new Date().toISOString(),
+      };
+      setEvents((prev) => [...prev, taskEvent]);
+    });
+
+    return () => {
+      es.close();
+    };
   }, [id]);
+
+  useEffect(() => {
+    eventsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [events]);
+
+  useEffect(() => {
+    if (events.length === 0) return;
+    const lastEvent = events[events.length - 1];
+    if (lastEvent && ["completed", "failed", "cancelled", "timed_out"].includes(lastEvent.eventType as string)) {
+      getTask(id).then(setTask).catch(() => {});
+    }
+  }, [events, id]);
 
   const handleCancel = async () => {
     if (!task || task.status !== "pending") return;
@@ -103,6 +189,8 @@ export default function TaskDetailPage() {
   }
 
   if (!task) return null;
+
+  const isAgentEvent = (type: string) => type.startsWith("agent_");
 
   return (
     <div className="space-y-6">
@@ -149,7 +237,6 @@ export default function TaskDetailPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Details */}
         <Card>
           <CardHeader>
             <CardTitle>Details</CardTitle>
@@ -204,7 +291,6 @@ export default function TaskDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Token Usage & Cost */}
         <Card>
           <CardHeader>
             <CardTitle>Usage & Cost</CardTitle>
@@ -213,58 +299,37 @@ export default function TaskDetailPage() {
             {task.tokenUsage ? (
               <>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Input Tokens
-                  </span>
-                  <span className="font-mono text-sm">
-                    {task.tokenUsage.inputTokens.toLocaleString()}
-                  </span>
+                  <span className="text-sm text-muted-foreground">Input Tokens</span>
+                  <span className="font-mono text-sm">{task.tokenUsage.inputTokens.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Output Tokens
-                  </span>
-                  <span className="font-mono text-sm">
-                    {task.tokenUsage.outputTokens.toLocaleString()}
-                  </span>
+                  <span className="text-sm text-muted-foreground">Output Tokens</span>
+                  <span className="font-mono text-sm">{task.tokenUsage.outputTokens.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Total Tokens
-                  </span>
-                  <span className="font-mono text-sm">
-                    {(
-                      task.tokenUsage.inputTokens + task.tokenUsage.outputTokens
-                    ).toLocaleString()}
-                  </span>
+                  <span className="text-sm text-muted-foreground">Total Tokens</span>
+                  <span className="font-mono text-sm">{(task.tokenUsage.inputTokens + task.tokenUsage.outputTokens).toLocaleString()}</span>
                 </div>
                 <div className="border-t pt-3">
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Cost</span>
-                    <span className="font-mono text-sm font-semibold">
-                      ${task.costUsd?.toFixed(6) ?? "0.000000"}
-                    </span>
+                    <span className="font-mono text-sm font-semibold">${task.costUsd?.toFixed(6) ?? "0.000000"}</span>
                   </div>
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Not yet available
-              </p>
+              <p className="text-sm text-muted-foreground">Not yet available</p>
             )}
             {task.error && (
               <div className="border-t pt-3">
                 <span className="text-sm text-muted-foreground">Error</span>
-                <p className="mt-1 rounded bg-destructive/10 p-2 font-mono text-xs text-destructive">
-                  {task.error}
-                </p>
+                <p className="mt-1 rounded bg-destructive/10 p-2 font-mono text-xs text-destructive">{task.error}</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Prompt */}
       <Card>
         <CardHeader>
           <CardTitle>Prompt</CardTitle>
@@ -273,10 +338,7 @@ export default function TaskDetailPage() {
           <pre className="overflow-x-auto rounded bg-muted p-4 text-sm">
             {task.systemPrompt && (
               <>
-                <span className="font-semibold text-muted-foreground">
-                  System:
-                </span>{" "}
-                {task.systemPrompt}
+                <span className="font-semibold text-muted-foreground">System:</span> {task.systemPrompt}
                 {"\n\n"}
               </>
             )}
@@ -285,57 +347,50 @@ export default function TaskDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Result */}
       {task.result && (
         <Card>
           <CardHeader>
             <CardTitle>Result</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="overflow-x-auto rounded bg-muted p-4 text-sm">
-              {task.result}
-            </pre>
+            <pre className="overflow-x-auto rounded bg-muted p-4 text-sm">{task.result}</pre>
           </CardContent>
         </Card>
       )}
 
-      {/* Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle>Timeline</CardTitle>
+          <CardTitle>Activity</CardTitle>
         </CardHeader>
         <CardContent>
           {events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No events recorded</p>
+            <p className="text-sm text-muted-foreground">Waiting for events...</p>
           ) : (
-            <div className="space-y-0">
+            <div className="space-y-0 max-h-[600px] overflow-y-auto">
               {events.map((event, idx) => (
-                <div key={event.id} className="flex gap-4 pb-4">
+                <div key={`${event.id}-${idx}`} className="flex gap-4 pb-4">
                   <div className="flex flex-col items-center">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                      {eventIcons[event.eventType] ?? (
-                        <Clock className="h-4 w-4" />
-                      )}
+                      {eventIcons[event.eventType] ?? <Clock className="h-4 w-4" />}
                     </div>
-                    {idx < events.length - 1 && (
-                      <div className="h-full w-px bg-border" />
-                    )}
+                    {idx < events.length - 1 && <div className="h-full w-px bg-border" />}
                   </div>
-                  <div className="pt-1">
-                    <p className="text-sm font-medium capitalize">
-                      {event.eventType.replace(/_/g, " ")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(event.createdAt).toLocaleString()}
-                    </p>
-                    {event.payload && (
-                      <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
-                        {JSON.stringify(event.payload, null, 2)}
-                      </pre>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm font-medium ${isAgentEvent(event.eventType) ? "font-mono" : ""} ${event.eventType === "agent_text" ? "text-blue-300" : event.eventType === "agent_thinking" ? "text-purple-300" : ""}`}>
+                        {isAgentEvent(event.eventType)
+                          ? (event.payload?.content as string)?.slice(0, 80) ?? event.eventType.replace("agent_", "")
+                          : event.eventType.replace(/_/g, " ")}
+                      </p>
+                      <p className="text-xs text-muted-foreground shrink-0">
+                        {new Date(event.createdAt).toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <AgentEventContent event={event} />
                   </div>
                 </div>
               ))}
+              <div ref={eventsEndRef} />
             </div>
           )}
         </CardContent>

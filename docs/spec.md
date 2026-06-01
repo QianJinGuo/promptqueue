@@ -560,7 +560,7 @@ Dark mode, minimal, data-dense — inspired by Vercel Dashboard and Linear.
 npm install -g promptqueue
 
 # Start the server (API + Worker + Dashboard)
-promptqueue serve --port 8080 --concurrency 10
+promptqueue serve --port 9090 --concurrency 10
 
 # Submit a task
 promptqueue submit "Summarize this article" --model claude-sonnet-4-6 --priority 2
@@ -583,7 +583,7 @@ promptqueue config set openai.apiKey sk-...
 ```yaml
 # ~/.promptqueue/config.yaml
 server:
-  port: 8080
+  port: 9090
   concurrency: 10
 
 storage:

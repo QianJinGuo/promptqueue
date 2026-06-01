@@ -97,7 +97,11 @@ export type TaskEventType =
   | "failed"
   | "retrying"
   | "cancelled"
-  | "timed_out";
+  | "timed_out"
+  | "agent_text"
+  | "agent_thinking"
+  | "agent_tool_call"
+  | "agent_tool_result";
 
 export interface TaskEvent {
   id: number;

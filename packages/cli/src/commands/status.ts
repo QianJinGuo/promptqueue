@@ -1,5 +1,5 @@
 export async function checkStatus(taskId: string, options: { apiUrl?: string }): Promise<void> {
-  const apiUrl = options.apiUrl ?? "http://localhost:8080";
+  const apiUrl = options.apiUrl ?? "http://localhost:9090";
 
   const response = await fetch(`${apiUrl}/api/v1/tasks/${taskId}`);
 

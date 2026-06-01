@@ -76,7 +76,7 @@ Commander-based CLI. Each command in `commands/` makes HTTP requests to the runn
 
 ### @promptqueue/dashboard
 
-Next.js 15 App Router with shadcn/ui (zinc color, CSS variables). Dark mode only (next-themes forced). API client in `src/lib/api-client.ts` fetches from `http://localhost:8080/api/v1`. Private package (not published to npm).
+Next.js 15 App Router with shadcn/ui (zinc color, CSS variables). Dark mode only (next-themes forced). API client in `src/lib/api-client.ts` fetches from `http://localhost:9090/api/v1`. Private package (not published to npm).
 
 ## Key Patterns
 

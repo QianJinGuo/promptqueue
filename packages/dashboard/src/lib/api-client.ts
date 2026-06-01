@@ -35,7 +35,7 @@ class ApiError extends Error {
   }
 }
 
-const BASE_URL = "http://localhost:8080/api/v1";
+const BASE_URL = "http://localhost:9090/api/v1";
 
 async function request<T>(
   path: string,
@@ -133,11 +133,15 @@ export async function getProviderHealth(
   );
 }
 
-export async function getTaskEvents(taskId: string): Promise<TaskEvent[]> {
+export async function getTaskEvents(
+  taskId: string,
+  signal?: AbortSignal
+): Promise<TaskEvent[]> {
   const response = await fetch(
-    `${BASE_URL}/${encodeURIComponent(taskId)}/events`,
+    `${BASE_URL}/tasks/${encodeURIComponent(taskId)}/events`,
     {
       headers: { Accept: "text/event-stream" },
+      signal,
     }
   );
 
@@ -179,6 +183,37 @@ export async function getTaskEvents(taskId: string): Promise<TaskEvent[]> {
   }
 
   return events;
+}
+
+export type StreamEvent = {
+  type: string;
+  data: unknown;
+};
+
+const SSE_EVENT_TYPES = [
+  "created", "started", "completed", "failed",
+  "retrying", "cancelled", "timed_out",
+  "agent_text", "agent_thinking", "agent_tool_call", "agent_tool_result",
+];
+
+export function subscribeToTaskEvents(
+  taskId: string,
+  onEvent: (event: StreamEvent) => void
+): EventSource {
+  const url = `${BASE_URL}/tasks/${encodeURIComponent(taskId)}/events`;
+  const es = new EventSource(url);
+
+  for (const eventType of SSE_EVENT_TYPES) {
+    es.addEventListener(eventType, (e: MessageEvent) => {
+      try {
+        onEvent({ type: eventType, data: JSON.parse(e.data) });
+      } catch {
+        // skip malformed
+      }
+    });
+  }
+
+  return es;
 }
 
 /** Fetch overview stats: queue depth grouped by status */

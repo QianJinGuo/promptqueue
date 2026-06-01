@@ -31,7 +31,8 @@ function createTestDb(): BetterSqlite3.Database {
       cost_usd REAL,
       created_at TEXT NOT NULL,
       started_at TEXT,
-      completed_at TEXT
+      completed_at TEXT,
+      next_retry_at INTEGER DEFAULT NULL
     );
 
     CREATE INDEX idx_tasks_status_priority ON tasks(status, priority, created_at);

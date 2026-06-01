@@ -39,7 +39,7 @@ describe("constants", () => {
   });
 
   test("DEFAULT_CONFIG has sensible defaults", () => {
-    expect(DEFAULT_CONFIG.server.port).toBe(8080);
+    expect(DEFAULT_CONFIG.server.port).toBe(9090);
     expect(DEFAULT_CONFIG.server.concurrency).toBe(10);
     expect(DEFAULT_CONFIG.storage.type).toBe("sqlite");
     expect(DEFAULT_CONFIG.routing.defaultStrategy).toBe("explicit");

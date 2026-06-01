@@ -5,6 +5,8 @@ import type { AppConfig } from "@promptqueue/core";
 import { configSchema, DEFAULT_CONFIG } from "@promptqueue/core";
 
 const DEFAULT_CONFIG_PATHS = [
+  join(process.cwd(), "promptqueue.config.yaml"),
+  join(process.cwd(), "promptqueue.config.yml"),
   join(homedir(), ".promptqueue", "config.yaml"),
   join(homedir(), ".promptqueue", "config.yml"),
 ];
@@ -89,7 +91,7 @@ function parseYaml(content: string): Record<string, unknown> {
     if (!trimmed || trimmed.startsWith("#")) continue;
 
     const indent = line.search(/\S/);
-    const match = trimmed.match(/^(\w+):\s*(.*)$/);
+    const match = trimmed.trimStart().match(/^(\w[\w-]*):\s*(.*)$/);
     if (!match) continue;
 
     const [, key, value] = match;

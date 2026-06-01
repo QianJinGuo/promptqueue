@@ -10,5 +10,6 @@ export async function startServe(options: { port?: number; config?: string }): P
     dbPath: config.storage.path,
     apiKey: process.env.PROMPTQUEUE_API_KEY,
     concurrency: config.server.concurrency,
+    config,
   });
 }

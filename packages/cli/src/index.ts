@@ -30,7 +30,7 @@ program
   .option("--max-tokens <tokens>", "Max response tokens", parseInt)
   .option("--temperature <temp>", "Sampling temperature", parseFloat)
   .option("--callback-url <url>", "Webhook callback URL")
-  .option("--api-url <url>", "API server URL", "http://localhost:8080")
+  .option("--api-url <url>", "API server URL", "http://localhost:9090")
   .action(async (prompt, options) => {
     const { submitTask } = await import("./commands/submit.js");
     await submitTask(prompt, options);
@@ -39,7 +39,7 @@ program
 program
   .command("status <taskId>")
   .description("Check task status")
-  .option("--api-url <url>", "API server URL", "http://localhost:8080")
+  .option("--api-url <url>", "API server URL", "http://localhost:9090")
   .action(async (taskId, options) => {
     const { checkStatus } = await import("./commands/status.js");
     await checkStatus(taskId, options);
@@ -52,7 +52,7 @@ program
   .option("-q, --queue <queue>", "Filter by queue")
   .option("-p, --priority <priority>", "Filter by priority", parseInt)
   .option("-l, --limit <limit>", "Max tasks to show", parseInt)
-  .option("--api-url <url>", "API server URL", "http://localhost:8080")
+  .option("--api-url <url>", "API server URL", "http://localhost:9090")
   .action(async (options) => {
     const { listTasks } = await import("./commands/list.js");
     await listTasks(options);

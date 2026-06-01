@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createInterface } from "node:readline";
 import type { ProviderAdapter, ProviderRequest, ProviderResponse, ProviderHealth, AgentRequest, AgentEvent } from "@promptqueue/core";
 import { logger } from "../logging.js";
 
@@ -52,34 +53,72 @@ export abstract class CliProvider implements ProviderAdapter {
       stdio: ["pipe", "pipe", "pipe"],
     }) as unknown as ChildProcess;
 
-    const cleanup = () => {
+    const abortHandler = () => {
       try { child.kill("SIGKILL"); } catch { /* already exited */ }
     };
+    signal?.addEventListener("abort", abortHandler, { once: true });
 
-    signal?.addEventListener("abort", () => {
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
       try { child.kill("SIGTERM"); } catch { /* already exited */ }
-    }, { once: true });
+    }, timeoutMs);
+
+    let stderr = "";
+    let rawStdout = "";
+    let yieldedEvents = false;
+    child.stderr?.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+    child.stdout?.on("data", (data: Buffer) => {
+      rawStdout += data.toString();
+    });
 
     try {
-      const result = await collectOutput(child, timeoutMs);
+      const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
 
-      if (result.timedOut) {
+      for await (const line of rl) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && typeof parsed === "object" && "type" in parsed) {
+            yieldedEvents = true;
+            yield parsed as AgentEvent;
+          }
+        } catch {
+          // Non-JSON line — skip, will fall back to parseOutput if no events
+        }
+      }
+
+      // Wait for process exit after stdout closes
+      const exitCode = await new Promise<number | null>((resolve) => {
+        child.on("close", resolve);
+        child.on("error", () => resolve(1));
+      });
+
+      if (timedOut) {
         yield { type: "error", error: "Task exceeded timeout" };
-        return;
-      }
-
-      if (result.exitCode !== 0) {
-        const errorMsg = result.stderr.trim() || `Process exited with code ${result.exitCode}`;
+      } else if (exitCode !== 0) {
+        const errorMsg = stderr.trim() || `Process exited with code ${exitCode}`;
         yield { type: "error", error: errorMsg };
-        return;
+      } else if (!yieldedEvents && rawStdout.trim()) {
+        // Stdout wasn't NDJSON — fall back to parseOutput
+        try {
+          const response = this.parseOutput(rawStdout);
+          yield { type: "completed", response };
+        } catch {
+          yield { type: "error", error: "Failed to parse command output" };
+        }
       }
 
-      const response = this.parseOutput(result.stdout);
-      yield { type: "completed", response };
-    } catch (err) {
-      cleanup();
-      const message = err instanceof Error ? err.message : String(err);
-      yield { type: "error", error: message };
+      if (stderr.trim()) {
+        logger.info(`CLI provider stderr: ${stderr.trim()}`);
+      }
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abortHandler);
     }
   }
 
@@ -134,7 +173,7 @@ function collectOutput(child: ChildProcess, timeoutMs: number): Promise<Collecte
       resolve({ stdout, stderr, exitCode: code, timedOut });
     });
 
-    child.on("error", (err) => {
+    child.on("error", () => {
       clearTimeout(timer);
       resolve({ stdout, stderr, exitCode: 1, timedOut: false });
     });

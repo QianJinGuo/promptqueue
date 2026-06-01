@@ -1,14 +1,29 @@
 import BetterSqlite3 from "better-sqlite3";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
 
 export interface DatabaseOptions {
   path: string;
   wal?: boolean;
 }
 
+function resolveDbPath(path: string): string {
+  if (path.startsWith("~/")) {
+    return join(homedir(), path.slice(2));
+  }
+  return path;
+}
+
 export function createDatabase(options: DatabaseOptions): BetterSqlite3.Database {
-  const db = new BetterSqlite3(options.path);
+  const resolvedPath = resolveDbPath(options.path);
+
+  if (resolvedPath !== ":memory:") {
+    mkdirSync(dirname(resolvedPath), { recursive: true });
+  }
+
+  const db = new BetterSqlite3(resolvedPath);
 
   if (options.wal !== false) {
     db.pragma("journal_mode = WAL");
@@ -37,7 +52,11 @@ export function runMigrations(db: BetterSqlite3.Database): void {
     ).map((row) => row.version)
   );
 
-  const migrationsDir = join(import.meta.dirname, "migrations");
+  const metaUrl = import.meta.url;
+  const currentDir = metaUrl
+    ? dirname(fileURLToPath(metaUrl))
+    : dirname(fileURLToPath(`file://${__filename}`));
+  const migrationsDir = join(currentDir, "migrations");
   let files: string[];
   try {
     files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();

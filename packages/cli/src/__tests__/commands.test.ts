@@ -40,10 +40,10 @@ describe("submitTask", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await submitTask("Hello world", { apiUrl: "http://localhost:8080" });
+    await submitTask("Hello world", { apiUrl: "http://localhost:9090" });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "http://localhost:8080/api/v1/tasks",
+      "http://localhost:9090/api/v1/tasks",
       expect.objectContaining({ method: "POST" })
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("t_01TEST123"));
@@ -58,11 +58,12 @@ describe("submitTask", () => {
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
+      // @ts-ignore
       throw new ExitEarly(code);
     });
 
     await expect(
-      submitTask("", { apiUrl: "http://localhost:8080" })
+      submitTask("", { apiUrl: "http://localhost:9090" })
     ).rejects.toThrow(ExitEarly);
 
     expect(errorSpy).toHaveBeenCalled();
@@ -102,7 +103,7 @@ describe("checkStatus", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await checkStatus("t_01TEST123", { apiUrl: "http://localhost:8080" });
+    await checkStatus("t_01TEST123", { apiUrl: "http://localhost:9090" });
 
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("completed"));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Mock response"));
@@ -117,11 +118,12 @@ describe("checkStatus", () => {
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
+      // @ts-ignore
       throw new ExitEarly(code);
     });
 
     await expect(
-      checkStatus("t_nonexistent", { apiUrl: "http://localhost:8080" })
+      checkStatus("t_nonexistent", { apiUrl: "http://localhost:9090" })
     ).rejects.toThrow(ExitEarly);
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("not found"));
@@ -155,7 +157,7 @@ describe("listTasks", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await listTasks({ apiUrl: "http://localhost:8080" });
+    await listTasks({ apiUrl: "http://localhost:9090" });
 
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("2 total"));
 
@@ -169,7 +171,7 @@ describe("listTasks", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await listTasks({ apiUrl: "http://localhost:8080" });
+    await listTasks({ apiUrl: "http://localhost:9090" });
 
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("No tasks found"));
 
@@ -183,7 +185,7 @@ describe("listTasks", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await listTasks({ status: "pending", priority: 1, apiUrl: "http://localhost:8080" });
+    await listTasks({ status: "pending", priority: 1, apiUrl: "http://localhost:9090" });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("status=pending"));
     expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("priority=1"));
