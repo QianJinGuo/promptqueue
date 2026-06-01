@@ -1,6 +1,8 @@
-import type { Task, RetryBackoff } from "@promptqueue/core";
+import type { Task, RetryBackoff, ProviderAdapter, ProviderRequest, ProviderResponse } from "@promptqueue/core";
 import type { TaskStore } from "../storage/task-store.js";
 import type { ProviderRegistry } from "../providers/registry.js";
+import { TimeoutError } from "./errors.js";
+import { calculateBackoff } from "./retry.js";
 
 export interface WorkerConfig {
   concurrency: number;
@@ -54,13 +56,13 @@ export class Worker {
   private async executeTask(task: Task): Promise<void> {
     try {
       const provider = this.registry.resolve(task.model);
-      const result = await provider.execute({
+      const result = await this.executeWithTimeout(provider, {
         prompt: task.prompt,
         systemPrompt: task.systemPrompt,
         model: task.model,
         maxTokens: task.maxTokens,
         temperature: task.temperature,
-      });
+      }, task.timeout);
 
       this.store.updateStatus(task.id, "completed", {
         result: result.result,
@@ -71,17 +73,53 @@ export class Worker {
 
       this.fireCallback(task, "completed");
     } catch (error: unknown) {
+      if (error instanceof TimeoutError) {
+        this.store.updateStatus(task.id, "timed_out", {
+          error: "Task exceeded timeout",
+        });
+        this.fireCallback(task, "timed_out");
+        return;
+      }
+
       const message = error instanceof Error ? error.message : String(error);
       const retryable = this.isRetryable(error);
 
       if (retryable && task.retryCount < task.maxRetries) {
+        const delay = calculateBackoff(
+          task.retryCount,
+          this.config.retryBackoff,
+          this.config.retryDelay
+        );
         this.store.updateStatus(task.id, "pending", {
           retryCount: task.retryCount + 1,
+          nextRetryAt: Date.now() + delay,
         });
       } else {
         this.store.updateStatus(task.id, "failed", { error: message });
         this.fireCallback(task, "failed");
       }
+    }
+  }
+
+  private async executeWithTimeout(
+    provider: ProviderAdapter,
+    request: ProviderRequest,
+    timeoutSeconds: number
+  ): Promise<ProviderResponse> {
+    const timeoutMs = timeoutSeconds * 1000;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new TimeoutError()), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([
+        provider.execute(request),
+        timeoutPromise,
+      ]);
+    } finally {
+      clearTimeout(timer!);
     }
   }
 
