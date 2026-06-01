@@ -6,6 +6,7 @@ import { ProviderRegistry } from "./providers/registry.js";
 import { MockProvider } from "./providers/mock.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
+import { ClaudeCodeProvider } from "./providers/claude-code.js";
 import { Worker } from "./worker/worker.js";
 import { createApp } from "./app.js";
 import { DEFAULT_CONFIG, type AppConfig } from "@promptqueue/core";
@@ -40,7 +41,7 @@ export function startServer(options: ServerOptions = {}): void {
 
   const config = options.config ?? DEFAULT_CONFIG;
 
-  const providers: Record<string, { apiKey?: string; defaultModel?: string; baseURL?: string }> = config.providers;
+  const providers: Record<string, { type?: "api" | "cli"; apiKey?: string; defaultModel?: string; baseURL?: string; command?: string }> = config.providers;
   const anthropic = providers["anthropic"];
   if (anthropic?.apiKey) {
     registry.register(new AnthropicProvider({
@@ -58,6 +59,20 @@ export function startServer(options: ServerOptions = {}): void {
       baseURL: openai.baseURL,
     }));
     log("Registered OpenAI provider");
+  }
+
+  // Register CLI providers
+  for (const [providerName, providerConfig] of Object.entries(providers)) {
+    if (providerConfig.type === "cli" && providerConfig.command) {
+      const CliClass = providerName === "claude-code" ? ClaudeCodeProvider : null;
+      if (CliClass) {
+        registry.register(new CliClass({
+          command: providerConfig.command,
+          defaultModel: providerConfig.defaultModel,
+        }));
+        log(`Registered CLI provider: ${providerName}`);
+      }
+    }
   }
 
   registry.register(new MockProvider());

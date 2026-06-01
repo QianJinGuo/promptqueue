@@ -46,9 +46,11 @@ export const configSchema = z.object({
   }).default({}),
   providers: z.record(
     z.object({
+      type: z.enum(["api", "cli"]).optional(),
       apiKey: z.string().optional(),
       defaultModel: z.string().optional(),
       baseURL: z.string().optional(),
+      command: z.string().optional(),
     })
   ).default({}),
   routing: z.object({

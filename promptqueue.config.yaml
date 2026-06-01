@@ -20,6 +20,10 @@ providers:
   openai:
       apiKey: ${OPENAI_API_KEY}
       defaultModel: gpt-4o
+  # claude-code:
+  #   type: cli
+  #   command: claude
+  #   defaultModel: claude-sonnet-4-6
 
 worker:
   pollInterval: 500

@@ -158,9 +158,11 @@ export interface StorageConfig {
 }
 
 export interface ProviderConfig {
+  type?: "api" | "cli";
   apiKey?: string;
   defaultModel?: string;
   baseURL?: string;
+  command?: string;
 }
 
 export interface RoutingConfig {
