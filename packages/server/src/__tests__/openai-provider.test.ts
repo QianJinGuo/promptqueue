@@ -14,7 +14,7 @@ describe("OpenAIProvider", () => {
   let mockCreate: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    const mod = (await import("openai")) as {
+    const mod = (await import("openai")) as unknown as {
       __mockCreate: ReturnType<typeof vi.fn>;
     };
     mockCreate = mod.__mockCreate;

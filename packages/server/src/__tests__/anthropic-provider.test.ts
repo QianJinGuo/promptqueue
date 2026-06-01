@@ -14,7 +14,7 @@ describe("AnthropicProvider", () => {
   let mockCreate: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    const mod = (await import("@anthropic-ai/sdk")) as {
+    const mod = (await import("@anthropic-ai/sdk")) as unknown as {
       __mockCreate: ReturnType<typeof vi.fn>;
     };
     mockCreate = mod.__mockCreate;
