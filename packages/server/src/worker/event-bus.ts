@@ -18,12 +18,12 @@ export class EventBus {
     };
   }
 
-  emit(taskId: string, event: AgentEvent): void {
+  emit(taskId: string, event: unknown): void {
     const listeners = this.taskListeners.get(taskId);
     if (listeners) {
       for (const listener of listeners) {
         try {
-          listener(event);
+          listener(event as AgentEvent);
         } catch {
           // Isolate listener failures
         }

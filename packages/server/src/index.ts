@@ -12,6 +12,7 @@ import { ToolRegistry } from "./tools/registry.js";
 import { createExecuteCommandTool } from "./tools/execute-command.js";
 import { createReadFileTool } from "./tools/read-file.js";
 import { createWriteFileTool } from "./tools/write-file.js";
+import { PendingInputStore, createAskUserTool } from "./tools/ask-user.js";
 import { Worker } from "./worker/worker.js";
 import { EventBus } from "./worker/event-bus.js";
 import { createApp } from "./app.js";
@@ -41,6 +42,16 @@ export function startServer(options: ServerOptions = {}): void {
   runMigrations(db);
 
   const taskStore = new TaskStore(db);
+
+  // Fail tasks stuck in waiting_for_input from a previous server run
+  const stuckTasks = taskStore.list({ status: "waiting_for_input" });
+  for (const task of stuckTasks.tasks) {
+    taskStore.updateStatus(task.id, "failed", {
+      error: "Server restarted while waiting for user input",
+    });
+    logger.info(`Failed stuck task ${task.id}: was waiting_for_input on restart`);
+  }
+
   const eventStore = new EventStore(db);
   const eventBus = new EventBus();
 
@@ -103,6 +114,17 @@ export function startServer(options: ServerOptions = {}): void {
     }
   }
 
+  // Create PendingInputStore for ask_user tool
+  const pendingInputStore = new PendingInputStore();
+
+  // Create worker first (ask_user needs releaseSlot/reclaimSlot references)
+  const worker = new Worker(taskStore, eventStore, eventBus, registry, null, {
+    concurrency,
+    pollInterval: config.worker.pollInterval,
+    retryBackoff: config.worker.retryBackoff,
+    retryDelay: config.worker.retryDelay,
+  });
+
   // Register tools if configured
   let toolRegistry: ToolRegistry | null = null;
   const toolConfig = (config as AppConfig).tools;
@@ -120,15 +142,21 @@ export function startServer(options: ServerOptions = {}): void {
       const writeTool = createWriteFileTool();
       toolRegistry.register(writeTool.definition, writeTool.executor);
     }
+    if (toolConfig.allowed.includes("ask_user")) {
+      const askUserTool = createAskUserTool({
+        pendingInputStore,
+        taskStore,
+        eventBus,
+        releaseSlot: () => worker.releaseSlot(),
+        reclaimSlot: () => worker.reclaimSlot(),
+        timeout: toolConfig.waitingForInputTimeout,
+      });
+      toolRegistry.register(askUserTool.definition, askUserTool.executor);
+    }
     log(`Registered tools: ${toolConfig.allowed.join(", ")}`);
   }
 
-  const worker = new Worker(taskStore, eventStore, eventBus, registry, toolRegistry, {
-    concurrency,
-    pollInterval: config.worker.pollInterval,
-    retryBackoff: config.worker.retryBackoff,
-    retryDelay: config.worker.retryDelay,
-  });
+  worker.setToolRegistry(toolRegistry);
 
   const app = createApp({
     taskStore,
@@ -138,6 +166,7 @@ export function startServer(options: ServerOptions = {}): void {
     defaultModel: config.routing.fallbackModel,
     apiKey: options.apiKey,
     rateLimit: config.server.rateLimit,
+    pendingInputStore,
   });
 
   worker.start();
