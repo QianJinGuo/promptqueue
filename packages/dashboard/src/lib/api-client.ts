@@ -117,6 +117,16 @@ export async function cancelTask(id: string): Promise<Task> {
   });
 }
 
+export async function submitTaskInput(
+  taskId: string,
+  response: string
+): Promise<Task> {
+  return request<Task>(`/tasks/${encodeURIComponent(taskId)}/input`, {
+    method: "POST",
+    body: JSON.stringify({ response }),
+  });
+}
+
 export async function getQueues(): Promise<QueueStats[]> {
   return request<QueueStats[]>("/queues");
 }

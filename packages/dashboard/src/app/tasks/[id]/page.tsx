@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getTask, cancelTask, subscribeToTaskEvents } from "@/lib/api-client";
+import { getTask, cancelTask, submitTaskInput, subscribeToTaskEvents } from "@/lib/api-client";
 import type { Task, TaskEvent, TaskEventType } from "@promptqueue/core";
 import {
   ArrowLeft,
@@ -124,6 +124,76 @@ function AgentEventContent({ event }: { event: TaskEvent }) {
   return null;
 }
 
+function AskUserInput({
+  taskId,
+  question,
+  options,
+  onSubmitted,
+}: {
+  taskId: string;
+  question: string;
+  options?: string[];
+  onSubmitted: () => void;
+}) {
+  const [response, setResponse] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(text: string) {
+    setSubmitting(true);
+    try {
+      await submitTaskInput(taskId, text);
+      setResponse("");
+      onSubmitted();
+    } catch {
+      // Error handled silently — user can retry
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-blue-800 bg-blue-950/30 p-4 my-4">
+      <p className="text-sm font-medium text-blue-300 mb-2">Agent asks:</p>
+      <p className="text-white mb-3">{question}</p>
+      {options && options.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => handleSubmit(opt)}
+              disabled={submitting}
+              className="px-3 py-1.5 text-sm rounded-md border border-zinc-600 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={response}
+          onChange={(e) => setResponse(e.target.value)}
+          placeholder="Type your response..."
+          className="flex-1 px-3 py-2 text-sm rounded-md border border-zinc-600 bg-zinc-900 text-white placeholder:text-zinc-500"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && response.trim()) {
+              handleSubmit(response.trim());
+            }
+          }}
+        />
+        <button
+          onClick={() => handleSubmit(response.trim())}
+          disabled={submitting || !response.trim()}
+          className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TaskDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -225,6 +295,13 @@ export default function TaskDetailPage() {
   if (!task) return null;
 
   const isAgentEvent = (type: string) => type.startsWith("agent_");
+
+  // Detect pending ask_user interaction
+  const askUserEvent = events
+    ?.filter((e: TaskEvent) => e.eventType === "agent_tool_call")
+    .findLast((e: TaskEvent) => e.payload?.name === "ask_user");
+
+  const isWaitingForInput = task.status === "waiting_for_input" && askUserEvent;
 
   return (
     <div className="space-y-6">
@@ -390,6 +467,17 @@ export default function TaskDetailPage() {
             <pre className="overflow-x-auto rounded bg-muted p-4 text-sm">{task.result}</pre>
           </CardContent>
         </Card>
+      )}
+
+      {isWaitingForInput && askUserEvent && (
+        <AskUserInput
+          taskId={task.id}
+          question={(askUserEvent.payload?.args as Record<string, unknown> | undefined)?.question as string ?? "Waiting for your input..."}
+          options={(askUserEvent.payload?.args as Record<string, string[]> | undefined)?.options}
+          onSubmitted={() => {
+            window.location.reload();
+          }}
+        />
       )}
 
       <Card>
