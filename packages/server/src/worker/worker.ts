@@ -3,6 +3,7 @@ import type { TaskStore } from "../storage/task-store.js";
 import type { EventStore } from "../storage/event-store.js";
 import type { ProviderRegistry } from "../providers/registry.js";
 import type { ToolRegistry } from "../tools/registry.js";
+import { OGClient, buildEnrichedPrompt } from "../og-client.js";
 import { EventBus } from "./event-bus.js";
 import { TimeoutError } from "./errors.js";
 import { calculateBackoff } from "./retry.js";
@@ -24,7 +25,8 @@ export class Worker {
     private eventBus: EventBus,
     private registry: ProviderRegistry,
     private toolRegistry: ToolRegistry | null,
-    private config: WorkerConfig
+    private config: WorkerConfig,
+    private ogClient?: OGClient,
   ) {}
 
   start(): void {
@@ -92,9 +94,18 @@ export class Worker {
     let errorMessage: string | undefined;
 
     try {
+      // OG context enrichment: inject past experiences and skills into system prompt
+      let enrichedSystemPrompt = task.systemPrompt;
+      if (this.ogClient) {
+        const ogContext = await this.ogClient.getContext(task.prompt, 5);
+        if (ogContext) {
+          enrichedSystemPrompt = buildEnrichedPrompt(task.systemPrompt, ogContext);
+        }
+      }
+
       const agentRequest: AgentRequest = {
         prompt: task.prompt,
-        systemPrompt: task.systemPrompt,
+        systemPrompt: enrichedSystemPrompt,
         model: task.model,
         maxTokens: task.maxTokens,
         temperature: task.temperature,
@@ -142,6 +153,20 @@ export class Worker {
         costUsd: finalResponse.costUsd,
       });
       this.fireCallback(task, "completed");
+
+      // OG experience capture: record task outcome after completion
+      if (this.ogClient) {
+        this.ogClient.learn(
+          task.prompt,
+          finalResponse.result,
+          true,
+          {
+            tokenUsage: { inputTokens: finalResponse.inputTokens, outputTokens: finalResponse.outputTokens },
+            costUsd: finalResponse.costUsd,
+            model: finalResponse.model,
+          },
+        ).catch(() => { /* graceful degradation */ });
+      }
     } else if (errorMessage) {
       // Check retryability — errors from executeAgent may be generic strings
       // so we use the same logic as the legacy path

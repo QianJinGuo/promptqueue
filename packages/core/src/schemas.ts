@@ -75,4 +75,13 @@ export const configSchema = z.object({
     timeout: z.coerce.number().int().positive().default(30),
     waitingForInputTimeout: z.coerce.number().int().positive().default(3600),
   }).optional(),
+  opengorilla: z.object({
+    enabled: z.boolean().default(false),
+    baseUrl: z.string().default("http://localhost:8190"),
+    timeout: z.coerce.number().int().positive().default(5000),
+    contextEnrichment: z.boolean().default(true),
+    experienceCapture: z.boolean().default(true),
+    resultVerification: z.boolean().default(false),
+    smartRouting: z.boolean().default(false),
+  }).optional(),
 });

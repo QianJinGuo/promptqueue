@@ -185,6 +185,16 @@ export interface WorkerConfig {
   maxRetries: number;
 }
 
+export interface OGConfig {
+  enabled: boolean;
+  baseUrl: string;
+  timeout: number;
+  contextEnrichment: boolean;
+  experienceCapture: boolean;
+  resultVerification: boolean;
+  smartRouting: boolean;
+}
+
 export interface AppConfig {
   server: ServerConfig;
   storage: StorageConfig;
@@ -192,4 +202,5 @@ export interface AppConfig {
   routing: RoutingConfig;
   worker: WorkerConfig;
   tools?: ToolConfig;
+  opengorilla?: OGConfig;
 }

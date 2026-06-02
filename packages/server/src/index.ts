@@ -16,6 +16,7 @@ import { PendingInputStore, createAskUserTool } from "./tools/ask-user.js";
 import { Worker } from "./worker/worker.js";
 import { EventBus } from "./worker/event-bus.js";
 import { createApp } from "./app.js";
+import { OGClient } from "./og-client.js";
 import { DEFAULT_CONFIG, type AppConfig } from "@promptqueue/core";
 import { logger } from "./logging.js";
 
@@ -117,13 +118,28 @@ export function startServer(options: ServerOptions = {}): void {
   // Create PendingInputStore for ask_user tool
   const pendingInputStore = new PendingInputStore();
 
+  // Initialize OpenGorilla client for context enrichment and experience capture
+  const ogConfig = (config as AppConfig).opengorilla;
+  const ogClient = ogConfig?.enabled ? new OGClient({
+    enabled: ogConfig.enabled,
+    baseUrl: ogConfig.baseUrl,
+    timeout: ogConfig.timeout,
+    contextEnrichment: ogConfig.contextEnrichment,
+    experienceCapture: ogConfig.experienceCapture,
+    resultVerification: ogConfig.resultVerification,
+    smartRouting: ogConfig.smartRouting,
+  }) : undefined;
+  if (ogClient) {
+    log("OpenGorilla client initialized");
+  }
+
   // Create worker first (ask_user needs releaseSlot/reclaimSlot references)
   const worker = new Worker(taskStore, eventStore, eventBus, registry, null, {
     concurrency,
     pollInterval: config.worker.pollInterval,
     retryBackoff: config.worker.retryBackoff,
     retryDelay: config.worker.retryDelay,
-  });
+  }, ogClient);
 
   // Register tools if configured
   let toolRegistry: ToolRegistry | null = null;

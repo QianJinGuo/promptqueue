@@ -32,7 +32,8 @@ The server starts on port 9090 with a SQLite-backed queue, an embedded worker, a
 - **Priority queues** -- five priority levels (critical, high, normal, low, best-effort) with FIFO ordering within each level
 - **Multi-provider support** -- Anthropic, OpenAI, Google Gemini, and LiteLLM proxy; provider-as-plugin architecture for community adapters
 - **Tool loop** -- Worker-owned tool execution with multi-turn agent loops; LLM calls tools, Worker governs and executes them
-- **Built-in tools** -- `execute_command`, `read_file`, `write_file` with security controls (allowed paths, command whitelists, size limits)
+- **Built-in tools** -- `execute_command`, `read_file`, `write_file`, `ask_user` with security controls (allowed paths, command whitelists, size limits)
+- **Human-in-the-Loop (HITL)** -- LLM can pause execution to ask the user a question via the `ask_user` tool; the dashboard shows an input UI for responding, and execution resumes automatically
 - **Tool governance** -- whitelist/blacklist filtering, timeout enforcement, and audit trail for every tool call
 - **Token tracking** -- input and output token counts recorded for every task
 - **Cost estimation** -- per-task USD cost calculated from provider pricing tables
@@ -102,6 +103,17 @@ curl -X DELETE http://localhost:9090/api/v1/tasks/t_01HXYZABCDEF \
   -H "Authorization: Bearer sk-..."
 ```
 
+### Respond to an agent's question (HITL)
+
+When a task is in `waiting_for_input` status, the agent is asking for clarification:
+
+```bash
+curl -X POST http://localhost:9090/api/v1/tasks/t_01HXYZABCDEF/input \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-..." \
+  -d '{"response": "Yes, proceed with the analysis"}'
+```
+
 ## CLI Commands
 
 ```bash
@@ -164,9 +176,11 @@ tools:
     - execute_command
     - read_file
     - write_file
+    - ask_user
   denied: []
   maxTurns: 10
   timeout: 30
+  waitingForInputTimeout: 3600
 ```
 
 ## Provider Setup

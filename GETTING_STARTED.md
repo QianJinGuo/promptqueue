@@ -250,6 +250,11 @@ curl http://localhost:9090/api/v1/tasks/t_01ABCDEF
 # Get task events
 curl http://localhost:9090/api/v1/tasks/t_01ABCDEF/events
 
+# Respond to an agent's question (HITL)
+curl -X POST http://localhost:9090/api/v1/tasks/t_01ABCDEF/input \
+  -H "Content-Type: application/json" \
+  -d '{"response": "Yes, proceed"}'
+
 # List queues
 curl http://localhost:9090/api/v1/queues
 
@@ -314,7 +319,8 @@ CLI providers support streaming agent events and automatic timeout handling via 
 - **Rate limiting** is enabled by default (100 requests/minute) when using `pnpm serve`
 - **Retry backoff** uses exponential strategy by default with configurable delays
 - **Tool loop** enables multi-turn agent execution when `--tools` flag is used with an `anthropic-sdk` provider; Worker governs tool calls via whitelist/blacklist
-- **Built-in tools** (`execute_command`, `read_file`, `write_file`) are available when `tools` config is present
+- **Built-in tools** (`execute_command`, `read_file`, `write_file`, `ask_user`) are available when `tools` config is present
+- **Human-in-the-Loop (HITL):** the `ask_user` tool lets the LLM pause execution and ask for clarification. Tasks enter `waiting_for_input` status. Provide input via `POST /api/v1/tasks/:id/input` or the dashboard. The concurrency slot is released while waiting, so other tasks can run. Configurable via `tools.waitingForInputTimeout` (default 3600s). Stuck tasks from a previous server run are failed on restart.
 - **Task timeout** defaults to 300 seconds; tasks exceeding it transition to `timed_out` status
 - Starting the built server directly with `node packages/server/dist/index.js` uses **in-memory** storage
 - The dashboard is **not** embedded — it runs separately on port 3000

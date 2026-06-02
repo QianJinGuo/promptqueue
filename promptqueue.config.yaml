@@ -31,4 +31,13 @@ worker:
   retryDelay: 1000
   maxRetries: 3
 
+opengorilla:
+  enabled: true
+  baseUrl: http://localhost:8190
+  timeout: 5000
+  contextEnrichment: true
+  experienceCapture: true
+  resultVerification: false
+  smartRouting: false
+
 
