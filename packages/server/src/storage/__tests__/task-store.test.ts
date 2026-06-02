@@ -270,6 +270,7 @@ describe("TaskStore", () => {
       expect(stats["default"]).toEqual({
         pending: 1,
         running: 1,
+        waitingForInput: 0,
         completed: 0,
         failed: 0,
         total: 2,
@@ -277,6 +278,7 @@ describe("TaskStore", () => {
       expect(stats["emails"]).toEqual({
         pending: 1,
         running: 0,
+        waitingForInput: 0,
         completed: 0,
         failed: 0,
         total: 1,

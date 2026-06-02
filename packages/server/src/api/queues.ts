@@ -28,7 +28,7 @@ queues.get("/:name", async (c) => {
 
   const queueStats = stats[name];
   if (!queueStats) {
-    return c.json({ success: true, data: { name, pending: 0, running: 0, completed: 0, failed: 0, total: 0 }, error: null });
+    return c.json({ success: true, data: { name, pending: 0, running: 0, waitingForInput: 0, completed: 0, failed: 0, total: 0 }, error: null });
   }
 
   return c.json({ success: true, data: { name, ...queueStats }, error: null });

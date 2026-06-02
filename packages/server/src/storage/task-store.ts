@@ -285,12 +285,13 @@ export class TaskStore {
     return this.updateStatus(id, "cancelled");
   }
 
-  getQueueStats(): Record<string, { pending: number; running: number; completed: number; failed: number; total: number }> {
+  getQueueStats(): Record<string, { pending: number; running: number; waitingForInput: number; completed: number; failed: number; total: number }> {
     const rows = this.db
       .prepare(
         `SELECT queue,
            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
            SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) as running,
+           SUM(CASE WHEN status = 'waiting_for_input' THEN 1 ELSE 0 END) as waiting_for_input,
            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
            COUNT(*) as total
@@ -301,16 +302,18 @@ export class TaskStore {
       queue: string;
       pending: number;
       running: number;
+      waiting_for_input: number;
       completed: number;
       failed: number;
       total: number;
     }>;
 
-    const result: Record<string, { pending: number; running: number; completed: number; failed: number; total: number }> = {};
+    const result: Record<string, { pending: number; running: number; waitingForInput: number; completed: number; failed: number; total: number }> = {};
     for (const row of rows) {
       result[row.queue] = {
         pending: row.pending,
         running: row.running,
+        waitingForInput: row.waiting_for_input,
         completed: row.completed,
         failed: row.failed,
         total: row.total,

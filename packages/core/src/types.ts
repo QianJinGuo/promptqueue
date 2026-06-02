@@ -143,6 +143,7 @@ export interface QueueStats {
   name: string;
   pending: number;
   running: number;
+  waitingForInput: number;
   completed: number;
   failed: number;
   total: number;
