@@ -24,7 +24,7 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 
 export const taskQuerySchema = z.object({
   status: z
-    .enum(["pending", "running", "completed", "failed", "cancelled", "timed_out"])
+    .enum(["pending", "running", "waiting_for_input", "completed", "failed", "cancelled", "timed_out"])
     .optional(),
   queue: z.string().optional(),
   priority: z.coerce.number().int().min(1).max(5).optional(),
@@ -73,5 +73,6 @@ export const configSchema = z.object({
     denied: z.array(z.string()).default([]),
     maxTurns: z.coerce.number().int().positive().default(10),
     timeout: z.coerce.number().int().positive().default(30),
+    waitingForInputTimeout: z.coerce.number().int().positive().default(3600),
   }).optional(),
 });

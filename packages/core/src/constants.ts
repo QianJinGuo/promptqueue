@@ -50,8 +50,9 @@ export const DEFAULT_CONFIG = {
 };
 
 export const DEFAULT_TOOL_CONFIG: ToolConfig = {
-  allowed: ["execute_command", "read_file", "write_file"],
+  allowed: ["execute_command", "read_file", "write_file", "ask_user"],
   denied: [],
   maxTurns: 10,
   timeout: 30,
+  waitingForInputTimeout: 3600,
 };

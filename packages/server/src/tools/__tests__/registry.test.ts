@@ -7,6 +7,7 @@ const MOCK_CONFIG: ToolConfig = {
   denied: ["execute_command:rm -rf"],
   maxTurns: 10,
   timeout: 5,
+  waitingForInputTimeout: 3600,
 };
 
 const READ_FILE_DEF: ToolDefinition = {

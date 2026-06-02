@@ -16,4 +16,5 @@ export interface ToolConfig {
   denied: string[];
   maxTurns: number;
   timeout: number;
+  waitingForInputTimeout: number;
 }

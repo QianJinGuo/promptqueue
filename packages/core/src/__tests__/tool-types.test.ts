@@ -31,6 +31,7 @@ describe("Tool types", () => {
       denied: [],
       maxTurns: 10,
       timeout: 30,
+      waitingForInputTimeout: 3600,
     };
     expect(config.maxTurns).toBe(10);
   });

@@ -9,6 +9,7 @@ export type { ToolDefinition, ToolResult, ToolExecutorFn, ToolConfig } from "./t
 export type TaskStatus =
   | "pending"
   | "running"
+  | "waiting_for_input"
   | "completed"
   | "failed"
   | "cancelled"
