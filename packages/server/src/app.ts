@@ -9,6 +9,8 @@ import type { TaskStore } from "./storage/task-store.js";
 import type { EventStore } from "./storage/event-store.js";
 import type { ProviderRegistry } from "./providers/registry.js";
 import type { EventBus } from "./worker/event-bus.js";
+import type { PendingInputStore } from "./tools/ask-user.js";
+import { PendingInputStore as PendingInputStoreClass } from "./tools/ask-user.js";
 
 export interface AppEnv {
   Variables: {
@@ -17,6 +19,7 @@ export interface AppEnv {
     eventBus: EventBus;
     providerRegistry: ProviderRegistry;
     defaultModel: string;
+    pendingInputStore: PendingInputStore;
   };
 }
 
@@ -28,6 +31,7 @@ export function createApp(deps: {
   defaultModel: string;
   apiKey?: string;
   rateLimit?: { windowMs: number; max: number };
+  pendingInputStore?: PendingInputStore;
 }) {
   const app = new Hono<AppEnv>();
 
@@ -43,6 +47,7 @@ export function createApp(deps: {
     c.set("eventBus", deps.eventBus);
     c.set("providerRegistry", deps.providerRegistry);
     c.set("defaultModel", deps.defaultModel);
+    c.set("pendingInputStore", deps.pendingInputStore ?? new PendingInputStoreClass());
     return next();
   });
 
