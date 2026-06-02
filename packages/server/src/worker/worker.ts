@@ -39,6 +39,18 @@ export class Worker {
     }
   }
 
+  releaseSlot(): void {
+    this.activeCount--;
+  }
+
+  reclaimSlot(): void {
+    this.activeCount++;
+  }
+
+  setToolRegistry(registry: ToolRegistry | null): void {
+    this.toolRegistry = registry;
+  }
+
   private async loop(): Promise<void> {
     while (this.running) {
       if (this.activeCount >= this.config.concurrency) {
@@ -89,7 +101,9 @@ export class Worker {
         timeout: task.timeout,
       };
 
-      const toolExecutor = this.toolRegistry ? this.toolRegistry.createExecutor() : undefined;
+      const toolExecutor = this.toolRegistry
+        ? (name: string, args: unknown) => this.toolRegistry!.executeWithContext(name, args, { taskId: task.id })
+        : undefined;
       if (toolExecutor && this.toolRegistry) {
         agentRequest.tools = this.toolRegistry.getDefinitions();
         agentRequest.maxTurns = agentRequest.maxTurns ?? 10;

@@ -67,4 +67,16 @@ export class ToolRegistry {
   createExecutor(): ToolExecutorFn {
     return async (name: string, args: unknown) => this.execute(name, args);
   }
+
+  executeWithContext(
+    name: string,
+    args: unknown,
+    taskContext: { taskId: string }
+  ): Promise<ToolResult> {
+    const argsWithContext =
+      typeof args === "object" && args !== null
+        ? { ...args, __taskId: taskContext.taskId }
+        : { __taskId: taskContext.taskId, value: args };
+    return this.execute(name, argsWithContext);
+  }
 }
