@@ -11,7 +11,7 @@ storage:
 
 routing:
   defaultStrategy: explicit
-  fallbackModel: glm-5.1
+  fallbackModel: gpt-5.4
 
 providers:
 #  anthropic:
@@ -23,7 +23,7 @@ providers:
   claude-code:
     type: cli
     command: claude
-    defaultModel: glm-5.1
+    defaultModel: gpt-5.4
 
 worker:
   pollInterval: 500

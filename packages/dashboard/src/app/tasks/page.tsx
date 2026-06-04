@@ -92,17 +92,17 @@ export default function TasksPage() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Tasks</h1>
         <p className="text-muted-foreground">
           View and filter all tasks
         </p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="w-40">
+      <div className="flex flex-wrap gap-2 md:gap-4">
+        <div className="w-full sm:w-40">
           <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="Status" />
@@ -118,7 +118,7 @@ export default function TasksPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="Priority" />
@@ -133,7 +133,7 @@ export default function TasksPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <Select value={queueFilter} onValueChange={(v) => { setQueueFilter(v); setPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="Queue" />
@@ -146,7 +146,7 @@ export default function TasksPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <Select value={modelFilter} onValueChange={(v) => { setModelFilter(v); setPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="Model" />
@@ -170,7 +170,7 @@ export default function TasksPage() {
 
       {/* Tasks Table */}
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="space-y-3 p-6">
               {Array.from({ length: 5 }).map((_, i) => (

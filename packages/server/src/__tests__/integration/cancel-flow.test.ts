@@ -91,7 +91,7 @@ describe("Cancel flow", () => {
     expect(body.data.status).toBe("cancelled");
   });
 
-  it("returns 409 when cancelling a running task", async () => {
+  it("cancels a running task via API", async () => {
     const { app, taskStore } = setupTestApp();
     const task = taskStore.create({ ...defaultTaskInput, prompt: "Running" });
     taskStore.updateStatus(task.id, "running");
@@ -99,9 +99,9 @@ describe("Cancel flow", () => {
     const res = await app.request(`/api/v1/tasks/${task.id}`, {
       method: "DELETE",
     });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
     const body = (await res.json()) as AnyJson;
-    expect(body.error).toContain("pending");
+    expect(body.data.status).toBe("cancelled");
   });
 
   it("returns 409 when cancelling a completed task", async () => {
@@ -114,7 +114,7 @@ describe("Cancel flow", () => {
     });
     expect(res.status).toBe(409);
     const body = (await res.json()) as AnyJson;
-    expect(body.error).toContain("pending");
+    expect(body.error).toContain("cannot be cancelled");
   });
 
   it("returns 404 when cancelling a nonexistent task", async () => {

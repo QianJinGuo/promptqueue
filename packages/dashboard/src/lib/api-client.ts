@@ -117,6 +117,12 @@ export async function cancelTask(id: string): Promise<Task> {
   });
 }
 
+export async function retryTask(id: string): Promise<Task> {
+  return request<Task>(`/tasks/${encodeURIComponent(id)}/retry`, {
+    method: "POST",
+  });
+}
+
 export async function submitTaskInput(
   taskId: string,
   response: string

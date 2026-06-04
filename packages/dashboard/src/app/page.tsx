@@ -91,16 +91,16 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Overview</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Queue depth, recent tasks, and provider status
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending</CardTitle>
@@ -160,15 +160,15 @@ export default function OverviewPage() {
         <CardHeader>
           <CardTitle>Recent Tasks</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="space-y-3">
+            <div className="space-y-3 p-6">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
           ) : recentTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tasks yet</p>
+            <p className="p-6 text-center text-sm text-muted-foreground">No tasks yet</p>
           ) : (
             <Table>
               <TableHeader>

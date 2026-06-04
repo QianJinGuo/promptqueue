@@ -122,7 +122,6 @@ export class Worker {
 
       for await (const event of provider.executeAgent!(agentRequest, abortController.signal, toolExecutor)) {
         this.eventBus.emit(task.id, event);
-        this.eventStore.appendAgentEvent(task.id, event);
 
         if (event.type === "completed") {
           finalResponse = event.response;
@@ -132,7 +131,13 @@ export class Worker {
           errorMessage = event.error;
           break;
         }
+
+        this.eventStore.appendAgentEvent(task.id, event);
       }
+
+      // completed/error events are handled above (break out of loop),
+      // and final status is recorded via updateStatus below — no
+      // duplicate appendAgentEvent needed for those terminal types.
     } catch (err: unknown) {
       if (err instanceof TimeoutError) {
         this.store.updateStatus(task.id, "timed_out", { error: "Task exceeded timeout" });
@@ -189,9 +194,18 @@ export class Worker {
     task: Task
   ): Promise<void> {
     try {
+      // OG context enrichment: inject past experiences and skills into system prompt
+      let enrichedSystemPrompt = task.systemPrompt;
+      if (this.ogClient) {
+        const ogContext = await this.ogClient.getContext(task.prompt, 5);
+        if (ogContext) {
+          enrichedSystemPrompt = buildEnrichedPrompt(task.systemPrompt, ogContext);
+        }
+      }
+
       const result = await this.executeWithTimeout(provider, {
         prompt: task.prompt,
-        systemPrompt: task.systemPrompt,
+        systemPrompt: enrichedSystemPrompt,
         model: task.model,
         maxTokens: task.maxTokens,
         temperature: task.temperature,
@@ -205,6 +219,20 @@ export class Worker {
       });
 
       this.fireCallback(task, "completed");
+
+      // OG experience capture: record task outcome after completion
+      if (this.ogClient) {
+        this.ogClient.learn(
+          task.prompt,
+          result.result,
+          true,
+          {
+            tokenUsage: { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+            costUsd: result.costUsd,
+            model: result.model,
+          },
+        ).catch(() => { /* graceful degradation */ });
+      }
     } catch (error: unknown) {
       if (error instanceof TimeoutError) {
         this.store.updateStatus(task.id, "timed_out", {

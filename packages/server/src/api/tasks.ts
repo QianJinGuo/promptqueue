@@ -15,6 +15,9 @@ interface Env {
   };
 }
 
+const CANCELLABLE_STATUSES = ["pending", "running", "waiting_for_input"] as const;
+const RETRYABLE_STATUSES = ["failed", "cancelled", "timed_out"] as const;
+
 const tasks = new Hono<Env>();
 
 tasks.post("/", zValidator("json", createTaskSchema), async (c) => {
@@ -65,9 +68,9 @@ tasks.delete("/:id", async (c) => {
     return c.json({ success: false, data: null, error: "Task not found" }, 404);
   }
 
-  if (task.status !== "pending" && task.status !== "waiting_for_input") {
+  if (!CANCELLABLE_STATUSES.includes(task.status as typeof CANCELLABLE_STATUSES[number])) {
     return c.json(
-      { success: false, data: null, error: "Only pending or waiting_for_input tasks can be cancelled" },
+      { success: false, data: null, error: `Task in '${task.status}' status cannot be cancelled` },
       409
     );
   }
@@ -77,7 +80,7 @@ tasks.delete("/:id", async (c) => {
     pendingInputStore.cancel(id);
   }
 
-  const cancelled = store.updateStatus(id, "cancelled");
+  const cancelled = store.updateStatus(id, "cancelled", { error: "Cancelled by user" });
   return c.json({ success: true, data: cancelled, error: null });
 });
 
@@ -126,6 +129,26 @@ tasks.post("/:id/input", async (c) => {
 
   const updated = store.getById(id);
   return c.json({ success: true, data: updated, error: null });
+});
+
+tasks.post("/:id/retry", async (c) => {
+  const { id } = c.req.param();
+  const store = c.get("taskStore");
+
+  const task = store.getById(id);
+  if (!task) {
+    return c.json({ success: false, data: null, error: "Task not found" }, 404);
+  }
+
+  if (!RETRYABLE_STATUSES.includes(task.status as typeof RETRYABLE_STATUSES[number])) {
+    return c.json(
+      { success: false, data: null, error: `Task in '${task.status}' status cannot be retried` },
+      409
+    );
+  }
+
+  const retried = store.updateStatus(id, "pending", { retryCount: 0 });
+  return c.json({ success: true, data: retried, error: null });
 });
 
 export { tasks };

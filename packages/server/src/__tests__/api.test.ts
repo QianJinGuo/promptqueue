@@ -154,10 +154,10 @@ describe("API routes", () => {
       expect(body.data.status).toBe("cancelled");
     });
 
-    it("returns 409 for non-pending task", async () => {
+    it("returns 409 for completed task", async () => {
       const { app, taskStore } = setupTestApp();
       const task = taskStore.create({ ...defaultTaskInput, prompt: "Test" });
-      taskStore.updateStatus(task.id, "running");
+      taskStore.updateStatus(task.id, "completed");
 
       const res = await app.request(`/api/v1/tasks/${task.id}`, { method: "DELETE" });
       expect(res.status).toBe(409);

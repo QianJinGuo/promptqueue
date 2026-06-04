@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getTask, cancelTask, submitTaskInput, subscribeToTaskEvents } from "@/lib/api-client";
+import { getTask, cancelTask, retryTask, submitTaskInput, subscribeToTaskEvents } from "@/lib/api-client";
 import type { Task, TaskEvent, TaskEventType } from "@promptqueue/core";
 import {
   ArrowLeft,
@@ -203,6 +203,7 @@ export default function TaskDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const eventsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function TaskDetailPage() {
   }, [events, id]);
 
   const handleCancel = async () => {
-    if (!task || task.status !== "pending") return;
+    if (!task || !["pending", "running", "waiting_for_input"].includes(task.status)) return;
     setCancelling(true);
     try {
       const updated = await cancelTask(id);
@@ -268,9 +269,22 @@ export default function TaskDetailPage() {
     }
   };
 
+  const handleRetry = async () => {
+    if (!task || !["failed", "cancelled", "timed_out"].includes(task.status)) return;
+    setRetrying(true);
+    try {
+      const updated = await retryTask(id);
+      setTask(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to retry task");
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -296,23 +310,25 @@ export default function TaskDetailPage() {
 
   const isAgentEvent = (type: string) => type.startsWith("agent_");
 
-  // Detect pending ask_user interaction
-  const askUserEvent = events
-    ?.filter((e: TaskEvent) => e.eventType === "agent_tool_call")
-    .findLast((e: TaskEvent) => e.payload?.name === "ask_user");
+  const isWaitingForInput = task.status === "waiting_for_input";
 
-  const isWaitingForInput = task.status === "waiting_for_input" && askUserEvent;
+  // Extract ask_user question/options from events (may arrive via SSE after status is already set)
+  const askUserEvent = isWaitingForInput
+    ? events
+        ?.filter((e: TaskEvent) => e.eventType === "agent_tool_call")
+        .findLast((e: TaskEvent) => e.payload?.name === "ask_user")
+    : undefined;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-wrap items-center gap-2 md:gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/tasks">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight">
             Task {task.id.slice(0, 16)}...
           </h1>
           <p className="text-sm text-muted-foreground">{task.id}</p>
@@ -328,7 +344,7 @@ export default function TaskDetailPage() {
         >
           {task.status}
         </Badge>
-        {task.status === "pending" && (
+        {["pending", "running", "waiting_for_input"].includes(task.status) && (
           <Button
             variant="destructive"
             size="sm"
@@ -336,6 +352,17 @@ export default function TaskDetailPage() {
             disabled={cancelling}
           >
             {cancelling ? "Cancelling..." : "Cancel Task"}
+          </Button>
+        )}
+        {["failed", "cancelled", "timed_out"].includes(task.status) && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRetry}
+            disabled={retrying}
+          >
+            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`} />
+            {retrying ? "Retrying..." : "Retry"}
           </Button>
         )}
       </div>
@@ -347,7 +374,7 @@ export default function TaskDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Details</CardTitle>
@@ -469,11 +496,11 @@ export default function TaskDetailPage() {
         </Card>
       )}
 
-      {isWaitingForInput && askUserEvent && (
+      {isWaitingForInput && (
         <AskUserInput
           taskId={task.id}
-          question={(askUserEvent.payload?.args as Record<string, unknown> | undefined)?.question as string ?? "Waiting for your input..."}
-          options={(askUserEvent.payload?.args as Record<string, string[]> | undefined)?.options}
+          question={(askUserEvent?.payload?.args as Record<string, unknown> | undefined)?.question as string ?? "Waiting for your input..."}
+          options={(askUserEvent?.payload?.args as Record<string, string[]> | undefined)?.options}
           onSubmitted={() => {
             window.location.reload();
           }}

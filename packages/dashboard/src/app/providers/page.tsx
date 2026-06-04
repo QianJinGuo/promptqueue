@@ -88,9 +88,9 @@ export default function ProvidersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Providers</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Providers</h1>
         <p className="text-muted-foreground">
           Provider health status, latency, and model list
         </p>
